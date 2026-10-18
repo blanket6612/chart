@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="ko" style="font-size: 14.4px;">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ BTC 4-Tier 미시구조 퀀트 터미널</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0b0f19; color: #f8fafc; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; margin: 0; padding: 0; }
+        .card { background-color: #111827; border: 1px solid #1f2937; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+        .text-up { color: #4ade80; }
+        .text-down { color: #f87171; }
+        
+        /* 탭 버튼 스타일 */
+        .tab-btn { transition: all 0.2s ease-in-out; }
+        .tab-active-0dte { background: rgba(248, 113, 113, 0.15) !important; color: #f87171 !important; border-color: #f87171 !important; box-shadow: 0 0 15px rgba(248, 113, 113, 0.25); }
+        .tab-active-1dte { background: rgba(96, 165, 250, 0.15) !important; color: #60a5fa !important; border-color: #60a5fa !important; box-shadow: 0 0 15px rgba(96, 165, 250, 0.25); }
+        .tab-active-monthly { background: rgba(192, 132, 252, 0.15) !important; color: #c084fc !important; border-color: #c084fc !important; box-shadow: 0 0 15px rgba(192, 132, 252, 0.25); }
+        .tab-active-nextmonth { background: rgba(45, 212, 191, 0.15) !important; color: #2dd4bf !important; border-color: #2dd4bf !important; box-shadow: 0 0 15px rgba(45, 212, 191, 0.25); }
+
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #0b0f19; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+
+        /* 시세 플래시 애니메이션 */
+        .flash-btc { animation: flashBtc 0.5s ease-out; }
+        .flash-dvol { animation: flashDvol 0.5s ease-out; }
+        @keyframes flashBtc { 0% { background-color: rgba(234, 179, 8, 0.2); } 100% { background-color: transparent; } }
+        @keyframes flashDvol { 0% { background-color: rgba(156, 163, 175, 0.2); } 100% { background-color: transparent; } }
+    </style>
+</head>
+<body class="p-4 md:p-6 overflow-y-scroll">
+
+    <div class="max-w-[1600px] mx-auto space-y-5">
+        <!-- 1. 최상단 헤더 & 시세 / 선물 베이시스 / DVOL / 스냅샷 컨트롤 바 -->
+        <div class="flex flex-col xl:flex-row justify-between items-center pb-4 border-b border-gray-800 gap-4">
+            <div class="flex items-center justify-between w-full xl:w-auto gap-3">
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl text-yellow-500 animate-pulse">⚡</span>
+                    <div>
+                        <h1 class="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                            BTC 미시구조 4-Tier 실시간 터미널
+                        </h1>
+                        <div class="text-xs text-gray-500 mt-0.5">OI 밀집 매물대 & 옵션 시장 넷 감마·델타 실시간 추적기</div>
+                    </div>
+                </div>
+
+                <!-- 스냅샷 컨트롤 (DB-less 시계열 비교기) -->
+                <div class="flex items-center gap-1.5 ml-2">
+                    <button onclick="saveSnapshot()" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-900/80 transition-colors flex items-center gap-1" title="현재 시점의 모든 지표를 브라우저에 고정하여 실시간 증감량(Δ)을 추적합니다">
+                        <span>📌</span> <span id="btn-snap-text">스냅샷 고정</span>
+                    </button>
+                    <button onclick="clearSnapshot()" id="btn-snap-clear" class="hidden px-2 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700 hover:text-rose-400 hover:border-rose-500/40 transition-colors" title="고정된 스냅샷 기준점을 초기화합니다">
+                        ✕
+                    </button>
+                </div>
+            </div>
+
+            <!-- 실시간 시세 (Deribit Spot + Perp/Basis + DVOL) -->
+            <div class="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-end">
+                <!-- Deribit 현물 인덱스 -->
+                <div class="card py-2 px-3.5 flex items-center gap-2.5 border-yellow-500/40 bg-yellow-500/5 flex-1 sm:flex-none" id="btc-card" title="Deribit 현물 인덱스 실시간 가격 (Underlying Spot)">
+                    <span class="text-xl text-yellow-500">₿</span>
+                    <div>
+                        <div class="text-[10px] text-gray-400 font-semibold uppercase flex items-center gap-1.5">
+                            <span>Underlying Spot</span>
+                            <span id="snap-diff-btc" class="text-[10px] font-mono"></span>
+                        </div>
+                        <div class="text-xl font-black text-yellow-400 font-mono tracking-tight" id="val-btc">--</div>
+                    </div>
+                </div>
+
+                <!-- 무기한 선물 & 실시간 베이시스 (데리비트 WS 직결 + 바이낸스 하이브리드) -->
+                <div class="card py-2 px-3.5 flex items-center gap-2.5 border-amber-500/30 bg-gray-900/60 flex-1 sm:flex-none" id="perp-card" title="무기한 선물 실시간 체결가 및 현물 지수 대비 베이시스(Perp - Spot)">
+                    <span class="text-lg text-amber-400">⚡</span>
+                    <div>
+                        <div class="text-[10px] text-gray-400 font-semibold uppercase flex items-center gap-1.5">
+                            <span id="perp-source-label">BTC PERP</span>
+                            <span id="val-basis" class="text-[10px] font-mono px-1 rounded bg-gray-800 text-gray-300">Basis --</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <div class="text-xl font-bold text-amber-300 font-mono tracking-tight" id="val-perp">--</div>
+                            <span id="val-funding" class="text-[10px] font-mono text-gray-400" title="8시간 기준 펀딩비율"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deribit DVOL -->
+                <div class="card py-2 px-3.5 flex items-center gap-2.5 border-gray-700 bg-gray-900/60 flex-1 sm:flex-none" id="dvol-card" title="Deribit 30일 옵션 내재변동성을 1년 단위(연율화)로 환산한 공포·변동성 지수">
+                    <span class="text-xl text-gray-400">📈</span>
+                    <div>
+                        <div class="text-[10px] text-gray-400 font-semibold uppercase flex items-center gap-1.5">
+                            <span>DVOL (30d IV)</span>
+                            <span id="snap-diff-dvol" class="text-[10px] font-mono"></span>
+                        </div>
+                        <div class="text-xl font-bold text-white font-mono" id="val-dvol">--</div>
+                    </div>
+                </div>
+
+                <div class="text-right pl-1 hidden sm:block">
+                    <div id="ws-status" class="inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700">
+                        <span class="text-yellow-500 animate-pulse mr-1.5">●</span> 연결 준비 중
+                    </div>
+                    <div class="text-[11px] text-gray-500 mt-1 font-mono">연산: <span id="val-update" class="text-gray-300">--:--:--</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1.5 4-Tier 멀티 만기 핵심 레벨 한눈에 비교 바 (단타/스윙 변곡점 통합 관측용) -->
+        <div class="card p-3 border-gray-800 bg-[#0f172a]/80">
+            <div class="flex justify-between items-center mb-2 px-1">
+                <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                    <span>🔭</span> 4-Tier 만기별 핵심 레벨 & 수급 요약 (Cross-Tier Confluence)
+                </div>
+                <div id="snap-status-banner" class="text-[11px] text-gray-500 font-mono">
+                    📌 상단 [스냅샷 고정] 클릭 시 시점 대비 실시간 증감량(Δ)이 표시됩니다.
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead>
+                        <tr class="text-[10px] text-gray-500 border-b border-gray-800">
+                            <th class="py-1 px-2">만기 구분</th>
+                            <th class="py-1 px-2 text-yellow-400">🧲 Zero Γ (플립선)</th>
+                            <th class="py-1 px-2 text-gray-300">📍 Zero Δ (수렴선)</th>
+                            <th class="py-1 px-2 text-gray-400">🎯 MaxPain</th>
+                            <th class="py-1 px-2">⚡ Net Γ ($ GEX)</th>
+                            <th class="py-1 px-2">🧭 Net Δ (플레이어)</th>
+                            <th class="py-1 px-2">🌪️ 25D Skew</th>
+                            <th class="py-1 px-2">🛡️ 1순위 P-Wall ~ C-Wall</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cross-tier-summary" class="divide-y divide-gray-800/50 text-xs">
+                        <tr id="sum-row-0dte" class="hover:bg-white/5 cursor-pointer" onclick="switchTab('0dte')"><td colspan="8" class="py-1.5 px-2 text-gray-500">데이터 연산 대기 중...</td></tr>
+                        <tr id="sum-row-1dte" class="hover:bg-white/5 cursor-pointer" onclick="switchTab('1dte')"></tr>
+                        <tr id="sum-row-monthly" class="hover:bg-white/5 cursor-pointer" onclick="switchTab('monthly')"></tr>
+                        <tr id="sum-row-nextmonth" class="hover:bg-white/5 cursor-pointer" onclick="switchTab('nextmonth')"></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 2. 상단 만기별 카테고리 탭 네비게이션 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+            <button onclick="switchTab('0dte')" id="btn-tab-0dte" class="tab-btn card py-3 px-4 text-center border-gray-800 hover:border-red-500/50 flex flex-col items-center justify-center gap-1 tab-active-0dte" title="당일 오후 5시(KST) 만기 도래 상품. 초단기 데이트레이딩 및 핀닝 관측">
+                <div class="text-sm font-bold flex items-center gap-1.5">
+                    <span>🔴 0DTE (당일물)</span>
+                </div>
+                <div class="text-[11px] text-gray-400 font-mono" id="tab-sub-0dte">만기 로딩중...</div>
+            </button>
+
+            <button onclick="switchTab('1dte')" id="btn-tab-1dte" class="tab-btn card py-3 px-4 text-center border-gray-800 hover:border-blue-500/50 flex flex-col items-center justify-center gap-1 opacity-70" title="내일 오후 5시(KST) 만기 상품. 당일물 직후 형성될 단기 포지션 관측">
+                <div class="text-sm font-bold flex items-center gap-1.5">
+                    <span>🔵 1DTE (차일물)</span>
+                </div>
+                <div class="text-[11px] text-gray-400 font-mono" id="tab-sub-1dte">만기 로딩중...</div>
+            </button>
+
+            <button onclick="switchTab('monthly')" id="btn-tab-monthly" class="tab-btn card py-3 px-4 text-center border-gray-800 hover:border-purple-500/50 flex flex-col items-center justify-center gap-1 opacity-70" title="당월 마지막 주 금요일 만기 상품. 중기 스윙 매물대 및 거시 감마 레짐">
+                <div class="text-sm font-bold flex items-center gap-1.5">
+                    <span>🟣 당월물 (Monthly)</span>
+                </div>
+                <div class="text-[11px] text-gray-400 font-mono" id="tab-sub-monthly">만기 로딩중...</div>
+            </button>
+
+            <button onclick="switchTab('nextmonth')" id="btn-tab-nextmonth" class="tab-btn card py-3 px-4 text-center border-gray-800 hover:border-teal-500/50 flex flex-col items-center justify-center gap-1 opacity-70" title="익월 마지막 주 금요일 만기 상품. 기관들의 장기 롤오버 및 거시 헤지">
+                <div class="text-sm font-bold flex items-center gap-1.5">
+                    <span>🟢 차월물 (Next Month)</span>
+                </div>
+                <div class="text-[11px] text-gray-400 font-mono" id="tab-sub-nextmonth">만기 로딩중...</div>
+            </button>
+        </div>
+
+        <!-- 3. 대시보드 메인 패널 컨테이너 -->
+        <div id="panels-container"></div>
+
+        <!-- 4. 하단 미시구조 지표 상세 가이드 -->
+        <div class="card p-5 border-gray-800 bg-[#0f172a]/70">
+            <div class="flex items-center gap-2 pb-3 mb-4 border-b border-gray-800">
+                <span class="text-base text-yellow-500">📖</span>
+                <h3 class="text-sm font-bold text-white tracking-wide">터미널 핵심 용어 및 지표 판별 가이드</h3>
+                <span class="text-xs text-gray-500 font-normal">| 화면의 각 항목에 마우스를 올리면 간이 툴팁이 표시됩니다.</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                <!-- 1열: 매물대 구조 & 회전율 -->
+                <div class="space-y-2.5">
+                    <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5 border-b border-gray-800/80 pb-1.5">
+                        <span class="text-emerald-400">🛡️</span> 매물대 구조 & 24h 회전율
+                    </div>
+                    <ul class="space-y-2 text-gray-400">
+                        <li>
+                            <strong class="text-rose-400">🔴 C-Wall (저항 매물대)</strong>:
+                            콜옵션 미결제약정(OI)이 가장 많이 집중된 상단 행사가.
+                        </li>
+                        <li>
+                            <strong class="text-emerald-400">🟢 P-Wall (지지 매물대)</strong>:
+                            풋옵션 미결제약정(OI)이 가장 많이 집중된 하단 행사가.
+                        </li>
+                        <li>
+                            <strong class="text-cyan-400">⚡ 회전율 (24h Vol / OI)</strong>:
+                            현재 잔고 대비 최근 24시간 동안 체결된 거래량 비중.
+                        </li>
+                        <li>
+                            <strong class="text-amber-300">🔥 Vol Top 10 (격전지)</strong>:
+                            최근 24시간 동안 실시간으로 자금이 가장 거세게 쏠린 스트라이크.
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 2열: 상단 7대 미시구조 지표 -->
+                <div class="space-y-2.5">
+                    <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5 border-b border-gray-800/80 pb-1.5">
+                        <span class="text-yellow-400">📊</span> 핵심 지표 (Greeks & 수급)
+                    </div>
+                    <ul class="space-y-2 text-gray-400">
+                        <li>
+                            <strong class="text-yellow-400">🎯 MaxPain (맥스페인)</strong>:
+                            옵션 매수자의 손실이 최대화되어 <strong>옵션 매도자/발행자의 수익이 극대화되는 가격</strong>. 만기 직전 가격 자석 역할.
+                        </li>
+                        <li>
+                            <strong class="text-yellow-400">🧲 Zero Γ (감마 플립)</strong>:
+                            넷 감마 노출이 0이 되는 분기점. <strong>상회 시 횡보/쿠션 장세, 하향 이탈 시 급격한 추세 가속(스퀴즈)</strong> 촉발.
+                        </li>
+                        <li>
+                            <strong class="text-gray-200">📍 Zero Δ (델타 수렴)</strong>:
+                            시장 넷 델타 노출이 0이 되는 지점. 상/하방 델타 리스크가 중립화되는 균형 가격.
+                        </li>
+                        <li>
+                            <strong class="text-emerald-400">Net Γ ($ GEX / 1%)</strong>:
+                            기초자산 1% 변동 시 딜러 헤징 요구 명목 달러 규모. 양수(+)면 변동성 완화, 음수(-)면 스퀴즈 연료.
+                        </li>
+                        <li>
+                            <strong class="text-gray-200">🧭 Net Δ (시장 순 델타)</strong>:
+                            시장 전체 미결제약정 누적 델타 합계(BTC). <strong>양수(+)는 롱 델타 우세, 음수(-)는 숏 델타 우세</strong>.
+                        </li>
+                        <li>
+                            <strong class="text-gray-200">🌪️ 25D Skew</strong>:
+                            25델타 풋과 콜의 내재변동성 스프레드. <strong>양수(+)는 하방 풋 헤지 수요 우세, 음수(-)는 상방 콜 베팅 우세</strong>.
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 3열: 2차 그릭스 & 시장 심리 -->
+                <div class="space-y-2.5">
+                    <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5 border-b border-gray-800/80 pb-1.5">
+                        <span class="text-blue-400">🌪️</span> 교차 그릭스 & 시장 심리
+                    </div>
+                    <ul class="space-y-2 text-gray-400">
+                        <li>
+                            <strong class="text-purple-300">Net Vanna (dΔ/dIV)</strong>:
+                            내재변동성 1% 변동 시 순 델타(BTC)의 민감도. <strong>IV 급락 시 숏커버링/덤핑 압력 유발</strong>.
+                        </li>
+                        <li>
+                            <strong class="text-emerald-300">Net Charm (dΔ/dt)</strong>:
+                            시간 경과(1일)에 따른 순 델타(BTC)의 감쇄 속도. <strong>만기 직전 헤징 포지션 자연 소멸 압력</strong>.
+                        </li>
+                        <li>
+                            <strong class="text-cyan-300">Net Vega (d$ / dIV)</strong>:
+                            내재변동성 1% 변동 시 전체 옵션 포지션의 명목 가치 변화량($).
+                        </li>
+                        <li>
+                            <strong class="text-gray-200">⚖️ PCR (Put-Call Ratio)</strong>:
+                            전체 풋옵션 미결제약정을 콜옵션으로 나눈 값. 1.0 초과 시 시장에 하방 방어 계약이 더 많음을 시사.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const SNAPSHOT_KEY = "btc_4tier_quant_snapshot_v1";
+        let latestMetrics = {};
+        let currentDvol = 0;
+        let perpPrice = 0;
+        let binanceActive = false;
+
+        const fmtMoney = (val) => "$" + val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        
+        // 순수 수치 포맷터 (K, M, B)
+        const fmtLarge = (val) => {
+            if (!val || val === 0) return "0";
+            let sign = val > 0 ? "+" : "";
+            let abs = Math.abs(val);
+            if (abs >= 1e9) return sign + (val / 1e9).toFixed(2) + "B";
+            if (abs >= 1e6) return sign + (val / 1e6).toFixed(2) + "M";
+            if (abs >= 1e3) return sign + (val / 1e3).toFixed(1) + "K";
+            return sign + val.toFixed(2);
+        };
+
+        // 명목 달러($) 포맷터 (+-$12.34M)
+        const fmtLargeUSD = (val) => {
+            if (!val || val === 0) return "$0";
+            let sign = val > 0 ? "+$" : "-$";
+            let abs = Math.abs(val);
+            if (abs >= 1e9) return sign + (abs / 1e9).toFixed(2) + "B";
+            if (abs >= 1e6) return sign + (abs / 1e6).toFixed(2) + "M";
+            if (abs >= 1e3) return sign + (abs / 1e3).toFixed(1) + "K";
+            return sign + abs.toFixed(2);
+        };
+
+        const fmtNum = (val) => val >= 1e6 ? (val/1e6).toFixed(2)+"M" : val >= 1e3 ? (val/1e3).toFixed(1)+"K" : val.toFixed(0);
+
+        function norm_pdf(x) { return Math.exp(-0.5 * x * x) / Math.sqrt(2.0 * Math.PI); }
+        function norm_cdf(x) {
+            let sign = 1; if (x < 0) { sign = -1; x = -x; }
+            let t = 1.0 / (1.0 + 0.3275911 * x);
+            let y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * norm_pdf(x);
+            return sign === 1 ? y : 1.0 - y;
+        }
+
+        function calculate_greeks(S, K, T, iv, is_call) {
+            if (T <= 0 || iv <= 0 || S <= 0) return { delta: 0, gamma: 0 };
+            let d1 = (Math.log(S / K) + (0.5 * iv * iv) * T) / (iv * Math.sqrt(T));
+            let gamma = norm_pdf(d1) / (S * iv * Math.sqrt(T));
+            let delta = is_call ? norm_cdf(d1) : norm_cdf(d1) - 1.0;
+            return { delta, gamma };
+        }
+
+        function calc_advanced_greeks(S, K, T, iv, is_call) {
+            if (T <= 0 || iv <= 0 || S <= 0) return { delta: 0, gamma: 0, theta: 0, vega: 0, vanna: 0, charm: 0 };
+            let d1 = (Math.log(S / K) + (0.5 * iv * iv) * T) / (iv * Math.sqrt(T));
+            let d2 = d1 - iv * Math.sqrt(T);
+            let pdf_d1 = norm_pdf(d1);
+            let gamma = pdf_d1 / (S * iv * Math.sqrt(T));
+            let delta = is_call ? norm_cdf(d1) : norm_cdf(d1) - 1.0;
+            let vega = S * pdf_d1 * Math.sqrt(T) / 100.0; 
+            let theta = (- (S * pdf_d1 * iv) / (2 * Math.sqrt(T))) / 365.0;
+            let vanna = - pdf_d1 * d2 / iv / 100.0; 
+            let charm = (pdf_d1 * d2 / (2 * T)) / 365.0; 
+            return { delta, gamma, theta, vega, vanna, charm };
+        }
+
+        function updateExpiries() {
+            let now = new Date();
+            let target0 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 8, 0, 0));
+            if (now.getTime() >= target0.getTime()) {
+                target0.setUTCDate(target0.getUTCDate() + 1);
+            }
+            let target1 = new Date(target0);
+            target1.setUTCDate(target1.getUTCDate() + 1);
+            
+            let year = target0.getUTCFullYear();
+            let month = target0.getUTCMonth();
+            
+            function getLastFriday(y, m) {
+                let d = new Date(Date.UTC(y, m + 1, 0, 8, 0, 0));
+                let dayOfWeek = d.getUTCDay(); 
+                let daysToSubtract = (dayOfWeek >= 5) ? dayOfWeek - 5 : dayOfWeek + 2;
+                d.setUTCDate(d.getUTCDate() - daysToSubtract);
+                return d;
+            }
+            
+            let targetMonthly = getLastFriday(year, month);
+            if (target0.getTime() > targetMonthly.getTime()) { 
+                month++;
+                if (month > 11) { month = 0; year++; }
+                targetMonthly = getLastFriday(year, month);
+            }
+
+            let nextMonth = month + 1;
+            let nextYear = year;
+            if (nextMonth > 11) { nextMonth = 0; nextYear++; }
+            let targetNextMonthly = getLastFriday(nextYear, nextMonth);
+            
+            const formatExpiry = (dt) => {
+                const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+                return `${dt.getUTCDate()}${months[dt.getUTCMonth()]}${dt.getUTCFullYear().toString().slice(-2)}`;
+            };
+
+            return {
+                exp0: { dt: target0, str: formatExpiry(target0), desc: "당일 KST 17:00" },
+                exp1: { dt: target1, str: formatExpiry(target1), desc: "내일 KST 17:00" },
+                expM: { dt: targetMonthly, str: formatExpiry(targetMonthly), desc: "당월 마지막 금요일" },
+                expNM: { dt: targetNextMonthly, str: formatExpiry(targetNextMonthly), desc: "차월 마지막 금요일" }
+            };
+        }
+
+        const tiers = [
+            { id: "0dte", name: "0DTE (당일물)", badge: "🔴" },
+            { id: "1dte", name: "1DTE (차일물)", badge: "🔵" },
+            { id: "monthly", name: "당월물 (Monthly)", badge: "🟣" },
+            { id: "nextmonth", name: "차월물 (Next Month)", badge: "🟢" }
+        ];
+
+        function initDOM() {
+            const container = document.getElementById('panels-container');
+            container.innerHTML = tiers.map(t => `
+                <div id="pane-${t.id}" class="space-y-6 ${t.id === '0dte' ? '' : 'hidden'}">
+                    
+                    <!-- [상단] 통합 미시구조 지표 & 실시간 감마 레짐 요약 박스 -->
+                    <div class="card p-5 border-gray-800 bg-[#111827]/90">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 mb-4 border-b border-gray-800 gap-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg">${t.badge}</span>
+                                <h2 class="text-base font-bold text-white">${t.name} 미시구조 지표군</h2>
+                                <span id="${t.id}-expiry-badge" class="text-xs text-gray-400 font-mono bg-gray-800/80 px-2 py-0.5 rounded border border-gray-700">만기 로드중...</span>
+                            </div>
+                            <div id="${t.id}-regime-banner" class="w-full md:w-auto px-3.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-3 bg-gray-800 border-gray-700 text-gray-300">
+                                <span>감마 레짐 연산 중...</span>
+                            </div>
+                        </div>
+
+                        <!-- 7대 핵심 지표 그리드 -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="옵션 매수자의 손실이 최대화되어 매도자/발행자의 이익이 극대화되는 행사가">
+                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
+                                    <span>🎯 MaxPain</span>
+                                    <span id="${t.id}-diff-maxpain" class="text-[10px] font-mono"></span>
+                                </div>
+                                <div class="text-lg font-bold text-white font-mono" id="${t.id}-maxpain">--</div>
+                                <div class="text-[10px] text-gray-500 mt-0.5">매도자 이익 극대화선</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-yellow-500/30 transition-colors" title="넷 감마가 0이 되는 분기점. 상회 시 변동성 억제(쿠션), 하향 돌파 시 감마 스퀴즈(추세 가속)">
+                                <div class="text-[11px] text-yellow-400 mb-1 flex items-center justify-between">
+                                    <span>🧲 Zero Γ (플립선)</span>
+                                    <span id="${t.id}-diff-zerogamma" class="text-[10px] font-mono"></span>
+                                </div>
+                                <div class="text-lg font-bold text-yellow-400 font-mono" id="${t.id}-zerogamma">--</div>
+                                <div class="text-[10px] text-gray-500 mt-0.5">횡보/가속 전환 분기점</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="시장 넷 델타가 0이 되는 지점. 상/하방 델타 리스크가 중립화되는 단기 가격 균형선">
+                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
+                                    <span>📍 Zero Δ (수렴선)</span>
+                                    <span id="${t.id}-diff-zerodelta" class="text-[10px] font-mono"></span>
+                                </div>
+                                <div class="text-lg font-bold text-gray-200 font-mono" id="${t.id}-zerodelta">--</div>
+                                <div class="text-[10px] text-gray-500 mt-0.5">델타 균형 지점</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="시장 넷 감마 노출량(Dollar GEX). 기초자산 1% 변동 시 헤지 달러 규모">
+                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
+                                    <span>⚡ Net Γ ($ GEX)</span>
+                                    <span id="${t.id}-diff-netgamma" class="text-[10px] font-mono"></span>
+                                </div>
+                                <div class="text-lg font-bold font-mono" id="${t.id}-netgamma">--</div>
+                                <div class="text-[10px] text-gray-500 mt-0.5" id="${t.id}-netgamma-sub">1% 변동당 헤지 노출</div>
+                            </div>
+                            
+                            <!-- 순 델타 카드 -->
+                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="시장 참여자 전체 미결제약정(OI)의 순 델타 합계(BTC). 양수(+)는 상방 롱 우세, 음수(-)는 하방 숏 우세">
+                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
+                                    <span>🧭 Net Δ (순 델타)</span>
+                                    <span id="${t.id}-diff-netdelta" class="text-[10px] font-mono"></span>
+                                </div>
+                                <div class="text-lg font-bold font-mono" id="${t.id}-netdelta">--</div>
+                                <div class="text-[10px] text-gray-500 mt-0.5" id="${t.id}-netdelta-sub">시장 델타 방향</div>
+                            </div>
+
+                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="25델타 풋 IV - 콜 IV (활성 OI 필터 적용). 양수(+)면 하방 풋 헤지 수요 우세, 음수(-)면 상방 콜 공격 우세">
+                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
+                                    <span>🌪️ 25D Skew</span>
+                                    <span id="${t.id}-diff-skew" class="text-[10px] font-mono"></span>
+                                </div>
+                                <div class="text-lg font-bold font-mono" id="${t.id}-skew">--</div>
+                                <div class="text-[10px] text-gray-500 mt-0.5">풋/콜 내재변동성 차</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="총 풋옵션 미결제약정 / 총 콜옵션 미결제약정. 1.0 초과 시 풋 미결제 우세">
+                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
+                                    <span>⚖️ PCR (OI)</span>
+                                    <span id="${t.id}-diff-pcr" class="text-[10px] font-mono"></span>
+                                </div>
+                                <div class="text-lg font-bold text-white font-mono" id="${t.id}-pcr">--</div>
+                                <div class="text-[10px] text-gray-500 mt-0.5">풋/콜 미결제약정 비율</div>
+                            </div>
+                        </div>
+
+                        <!-- 2차 & 교차 그릭스 그리드 -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-800/80">
+                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="내재변동성 1% 변동 시 시장 포지션 명목 가치 변화량">
+                                <span class="text-xs text-gray-400">Net Vega (변동성 노출)</span>
+                                <div class="text-right">
+                                    <span class="text-xs font-bold font-mono text-gray-300" id="${t.id}-netvega">--</span>
+                                    <span id="${t.id}-diff-netvega" class="text-[10px] font-mono ml-1"></span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="하루 경과 시 시장 포지션 시간가치 감쇄량">
+                                <span class="text-xs text-gray-400">Net Theta (시간가치 감쇄)</span>
+                                <div class="text-right">
+                                    <span class="text-xs font-bold font-mono text-gray-300" id="${t.id}-nettheta">--</span>
+                                    <span id="${t.id}-diff-nettheta" class="text-[10px] font-mono ml-1"></span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="내재변동성(IV) 1% 변화 시 순 델타(BTC)의 변화량 (dΔ/dIV)">
+                                <span class="text-xs text-purple-400">Net Vanna (바나)</span>
+                                <div class="text-right">
+                                    <span class="text-xs font-bold font-mono text-purple-300" id="${t.id}-netvanna">--</span>
+                                    <span id="${t.id}-diff-netvanna" class="text-[10px] font-mono ml-1"></span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="하루(1일) 경과 시 순 델타(BTC)의 변화량 (dΔ/dt)">
+                                <span class="text-xs text-emerald-400">Net Charm (참)</span>
+                                <div class="text-right">
+                                    <span class="text-xs font-bold font-mono text-emerald-300" id="${t.id}-netcharm">--</span>
+                                    <span id="${t.id}-diff-netcharm" class="text-[10px] font-mono ml-1"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- [하단 2열] 좌: 미결제약정(OI) 밀집 방어벽 Top 10 / 우: 24h 거래량 Top 10 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        
+                        <!-- 🛡️ 좌측: 누적 미결제약정 방어벽 Top 10 -->
+                        <div class="card p-4 border-gray-800">
+                            <div class="flex justify-between items-center pb-2.5 mb-3 border-b border-gray-800">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-base">🛡️</span>
+                                    <h3 class="text-sm font-bold text-white">미결제약정 밀집 방어벽 (OI Top 10)</h3>
+                                </div>
+                                <div class="text-[11px] text-gray-400">
+                                    정렬: <span class="text-gray-300 font-semibold">누적 미결제약정(OI) 상위 순</span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Call Wall Top 10 -->
+                                <div>
+                                    <div class="text-xs font-bold text-rose-400 flex justify-between items-center mb-2 px-1">
+                                        <span title="콜옵션 미결제약정이 밀집된 상단 저항선">🔴 C-Wall (저항 매물대)</span>
+                                        <span class="text-[10px] text-gray-500 font-normal">OI / 24h Vol</span>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left text-xs">
+                                            <thead>
+                                                <tr class="text-[10px] text-gray-500 border-b border-gray-800">
+                                                    <th class="py-1.5 px-1 text-center w-8">순위</th>
+                                                    <th class="py-1.5 px-1">행사가</th>
+                                                    <th class="py-1.5 px-1 text-right" title="현재 누적 미결제약정">OI</th>
+                                                    <th class="py-1.5 px-1 text-right" title="최근 24시간 동안 체결된 거래량">24h Vol</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="${t.id}-cwalls" class="divide-y divide-gray-800/40"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Put Wall Top 10 -->
+                                <div>
+                                    <div class="text-xs font-bold text-emerald-400 flex justify-between items-center mb-2 px-1">
+                                        <span title="풋옵션 미결제약정이 밀집된 하단 지지선">🟢 P-Wall (지지 매물대)</span>
+                                        <span class="text-[10px] text-gray-500 font-normal">OI / 24h Vol</span>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left text-xs">
+                                            <thead>
+                                                <tr class="text-[10px] text-gray-500 border-b border-gray-800">
+                                                    <th class="py-1.5 px-1 text-center w-8">순위</th>
+                                                    <th class="py-1.5 px-1">행사가</th>
+                                                    <th class="py-1.5 px-1 text-right" title="현재 누적 미결제약정">OI</th>
+                                                    <th class="py-1.5 px-1 text-right" title="최근 24시간 동안 체결된 거래량">24h Vol</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="${t.id}-pwalls" class="divide-y divide-gray-800/40"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 🔥 우측: 최근 24시간 실시간 거래량 밀집 Top 10 -->
+                        <div class="card p-4 border-gray-800">
+                            <div class="flex justify-between items-center pb-2.5 mb-3 border-b border-gray-800">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-base">🔥</span>
+                                    <h3 class="text-sm font-bold text-white">최근 24시간 거래량 집중 (Vol Top 10)</h3>
+                                </div>
+                                <div class="text-[11px] text-orange-400 font-semibold" title="신규 진입 및 청산이 격렬하게 일어난 단기 실시간 격전지">단기 실체결 격전지</div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Call Vol Top 10 -->
+                                <div>
+                                    <div class="text-xs font-bold text-orange-400 flex justify-between items-center mb-2 px-1">
+                                        <span title="최근 24시간 콜옵션 매수/매도 체결량 집중 구간">🔥 Call 배팅 (상방 공격)</span>
+                                        <span class="text-[10px] text-gray-500 font-normal">24h Vol / OI / 회전</span>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left text-xs">
+                                            <thead>
+                                                <tr class="text-[10px] text-gray-500 border-b border-gray-800">
+                                                    <th class="py-1.5 px-1 text-center w-8">순위</th>
+                                                    <th class="py-1.5 px-1">행사가</th>
+                                                    <th class="py-1.5 px-1 text-right" title="24시간 누적 거래량">24h Vol</th>
+                                                    <th class="py-1.5 px-1 text-right" title="현재 누적 잔고">누적 OI</th>
+                                                    <th class="py-1.5 px-1 text-center" title="거래량 / 미결제약정 회전율">회전율</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="${t.id}-cvol" class="divide-y divide-gray-800/40"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Put Vol Top 10 -->
+                                <div>
+                                    <div class="text-xs font-bold text-orange-400 flex justify-between items-center mb-2 px-1">
+                                        <span title="최근 24시간 풋옵션 매수/매도 체결량 집중 구간">🔥 Put 배팅 (하방 공격)</span>
+                                        <span class="text-[10px] text-gray-500 font-normal">24h Vol / OI / 회전</span>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left text-xs">
+                                            <thead>
+                                                <tr class="text-[10px] text-gray-500 border-b border-gray-800">
+                                                    <th class="py-1.5 px-1 text-center w-8">순위</th>
+                                                    <th class="py-1.5 px-1">행사가</th>
+                                                    <th class="py-1.5 px-1 text-right" title="24시간 누적 거래량">24h Vol</th>
+                                                    <th class="py-1.5 px-1 text-right" title="현재 누적 잔고">누적 OI</th>
+                                                    <th class="py-1.5 px-1 text-center" title="거래량 / 미결제약정 회전율">회전율</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="${t.id}-pvol" class="divide-y divide-gray-800/40"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            `).join('');
+        }
+
+        let currentTab = '0dte';
+        function switchTab(targetId) {
+            currentTab = targetId;
+            tiers.forEach(t => {
+                const pane = document.getElementById(`pane-${t.id}`);
+                const btn = document.getElementById(`btn-tab-${t.id}`);
+                if (t.id === targetId) {
+                    pane.classList.remove('hidden');
+                    btn.classList.add(`tab-active-${t.id}`);
+                    btn.classList.remove('opacity-70');
+                } else {
+                    pane.classList.add('hidden');
+                    btn.classList.remove(`tab-active-${t.id}`);
+                    btn.classList.add('opacity-70');
+                }
+            });
+        }
+
+        initDOM();
+
+        // [스냅샷 관리 함수]
+        function getSavedSnapshot() {
+            try {
+                const raw = localStorage.getItem(SNAPSHOT_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) { return null; }
+        }
+
+        function saveSnapshot() {
+            if (Object.keys(latestMetrics).length === 0) return;
+            const snap = {
+                timeStr: new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                btcPrice: btcPrice,
+                dvol: currentDvol,
+                tiers: JSON.parse(JSON.stringify(latestMetrics))
+            };
+            try {
+                localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
+                updateSnapshotUI();
+                fetchQuantData();
+            } catch (e) {}
+        }
+
+        function clearSnapshot() {
+            try {
+                localStorage.removeItem(SNAPSHOT_KEY);
+                updateSnapshotUI();
+                fetchQuantData();
+            } catch (e) {}
+        }
+
+        function updateSnapshotUI() {
+            const snap = getSavedSnapshot();
+            const btnText = document.getElementById('btn-snap-text');
+            const btnClear = document.getElementById('btn-snap-clear');
+            const banner = document.getElementById('snap-status-banner');
+
+            if (snap) {
+                btnText.innerText = `${snap.timeStr} 기준 갱신`;
+                btnClear.classList.remove('hidden');
+                banner.innerHTML = `<span class="text-indigo-400 font-semibold">📌 [${snap.timeStr}] 스냅샷 고정됨 (Spot $${Math.round(snap.btcPrice).toLocaleString()})</span> · 실시간 증감량(Δ) 표시 중`;
+            } else {
+                btnText.innerText = "스냅샷 고정";
+                btnClear.classList.add('hidden');
+                banner.innerText = "📌 상단 [스냅샷 고정] 클릭 시 시점 대비 실시간 증감량(Δ)이 표시됩니다.";
+                document.getElementById('snap-diff-btc').innerText = "";
+                document.getElementById('snap-diff-dvol').innerText = "";
+                tiers.forEach(t => {
+                    ['maxpain','zerogamma','zerodelta','netgamma','netdelta','skew','pcr','netvega','nettheta','netvanna','netcharm'].forEach(k => {
+                        const el = document.getElementById(`${t.id}-diff-${k}`);
+                        if (el) el.innerText = "";
+                    });
+                });
+            }
+        }
+
+        updateSnapshotUI();
+
+        // [무기한 선물 가격 & 실시간 베이시스 렌더링 함수]
+        function updatePerpAndBasis(newPerpPrice, sourceName, funding8h = null) {
+            if (!newPerpPrice || newPerpPrice <= 0) return;
+            perpPrice = newPerpPrice;
+
+            const perpEl = document.getElementById('val-perp');
+            const labelEl = document.getElementById('perp-source-label');
+            const fundEl = document.getElementById('val-funding');
+
+            if (perpEl) {
+                perpEl.innerText = "$" + perpPrice.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            }
+            if (labelEl && sourceName) {
+                labelEl.innerText = sourceName;
+            }
+            if (fundEl && funding8h !== null && funding8h !== undefined) {
+                const fPct = (funding8h * 100).toFixed(4);
+                fundEl.innerText = `F: ${funding8h >= 0 ? '+' : ''}${fPct}%`;
+                fundEl.className = `text-[10px] font-mono ${funding8h > 0.0001 ? 'text-amber-400' : funding8h < 0 ? 'text-cyan-400' : 'text-gray-400'}`;
+            }
+
+            if (btcPrice > 0 && perpPrice > 0) {
+                const basis = perpPrice - btcPrice;
+                const basisEl = document.getElementById('val-basis');
+                if (basisEl) {
+                    const sign = basis >= 0 ? "+" : "-";
+                    basisEl.innerText = `Basis ${sign}$${Math.abs(basis).toFixed(1)}`;
+                    basisEl.className = `text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${basis > 50 ? 'bg-rose-950/80 text-rose-400 border border-rose-500/40' : basis < -20 ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40' : 'bg-gray-800 text-gray-300'}`;
+                }
+            }
+        }
+
+        // [바이낸스 선물 REST 폴링 시도 (성공 시 BINANCE PERP 우선 표기, 차단 시 데리비트 WS가 자동 대체)]
+        async function pollBinancePerpREST() {
+            try {
+                const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT", { cache: "no-store" });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.price) {
+                        binanceActive = true;
+                        updatePerpAndBasis(parseFloat(data.price), "BINANCE PERP");
+                    }
+                }
+            } catch (e) {
+                // 로컬 file:// 환경 등에서 바이낸스 도메인 차단 시 데리비트 웹소켓(id: 4)이 자동 처리
+                binanceActive = false;
+            }
+        }
+
+        // [데리비트 웹소켓 연결 (옵션 데이터 + BTC-PERPETUAL 실시간 선물 데이터 일체형 수신)]
+        const wsUrl = "wss://www.deribit.com/ws/api/v2";
+        let ws = null;
+        let quantTimer = null;
+        let perpTimer = null;
+        let btcPrice = 0;
+        
+        function connectWS() {
+            ws = new WebSocket(wsUrl);
+            ws.onopen = function() {
+                const el = document.getElementById('ws-status');
+                el.className = "inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-700/50";
+                el.innerHTML = '<span class="text-emerald-400 mr-1.5">●</span> 웹소켓 연결됨';
+                
+                ws.send(JSON.stringify({ "jsonrpc": "2.0", "id": 1, "method": "public/subscribe", "params": { "channels": ["deribit_price_index.btc_usd"] } }));
+                ws.send(JSON.stringify({ "jsonrpc": "2.0", "id": 2, "method": "public/subscribe", "params": { "channels": ["deribit_volatility_index.btc_usd"] } }));
+                
+                fetchPerpTicker();
+                fetchQuantData();
+
+                if (quantTimer) clearInterval(quantTimer);
+                quantTimer = setInterval(fetchQuantData, 5000);
+
+                if (perpTimer) clearInterval(perpTimer);
+                perpTimer = setInterval(() => {
+                    fetchPerpTicker();
+                    pollBinancePerpREST();
+                }, 2000);
+            };
+
+            ws.onmessage = function(event) {
+                const msg = JSON.parse(event.data);
+                const snap = getSavedSnapshot();
+                
+                if (msg.method === 'subscription') {
+                    const channel = msg.params.channel;
+                    if (channel === 'deribit_price_index.btc_usd') {
+                        btcPrice = msg.params.data.price;
+                        document.getElementById('val-btc').innerText = fmtMoney(btcPrice);
+                        if (perpPrice > 0) updatePerpAndBasis(perpPrice, null);
+                        if (snap && snap.btcPrice) {
+                            const diffBtc = btcPrice - snap.btcPrice;
+                            const diffEl = document.getElementById('snap-diff-btc');
+                            diffEl.innerText = `(${diffBtc >= 0 ? '+' : ''}${Math.round(diffBtc)})`;
+                            diffEl.className = `text-[10px] font-mono ${diffBtc >= 0 ? 'text-up' : 'text-down'}`;
+                        }
+                        let btcCard = document.getElementById('btc-card');
+                        btcCard.classList.remove('flash-btc');
+                        void btcCard.offsetWidth;
+                        btcCard.classList.add('flash-btc');
+                    }
+                    if (channel === 'deribit_volatility_index.btc_usd') {
+                        currentDvol = msg.params.data.volatility;
+                        document.getElementById('val-dvol').innerText = currentDvol.toFixed(2) + "%";
+                        if (snap && snap.dvol) {
+                            const diffDvol = currentDvol - snap.dvol;
+                            const diffEl = document.getElementById('snap-diff-dvol');
+                            diffEl.innerText = `(${diffDvol >= 0 ? '+' : ''}${diffDvol.toFixed(2)}%)`;
+                            diffEl.className = `text-[10px] font-mono ${diffDvol >= 0 ? 'text-rose-400' : 'text-emerald-400'}`;
+                        }
+                        let dvolCard = document.getElementById('dvol-card');
+                        if (dvolCard) {
+                            dvolCard.classList.remove('flash-dvol');
+                            void dvolCard.offsetWidth;
+                            dvolCard.classList.add('flash-dvol');
+                        }
+                    }
+                }
+
+                // [신규 패치] 기존 데리비트 웹소켓을 통한 BTC-PERPETUAL 실시간 선물/베이시스/펀딩비 수신 (100% 작동 보장)
+                if (msg.id === 4 && msg.result) {
+                    const r = msg.result;
+                    const deribitPerp = r.last_price || r.mark_price || 0;
+                    const funding8h = r.funding_8h !== undefined ? r.funding_8h : r.current_funding;
+                    if (!binanceActive && deribitPerp > 0) {
+                        updatePerpAndBasis(deribitPerp, "BTC PERP", funding8h);
+                    } else if (binanceActive && funding8h !== undefined) {
+                        // 바이낸스 가격이 활성화된 상태에서도 펀딩비 보조 표기 업데이트
+                        updatePerpAndBasis(perpPrice, "BINANCE PERP", funding8h);
+                    }
+                }
+                
+                if (msg.id === 3 && msg.result) {
+                    let expiries = updateExpiries();
+
+                    document.getElementById('tab-sub-0dte').innerText = `${expiries.exp0.str} (${expiries.exp0.desc})`;
+                    document.getElementById('tab-sub-1dte').innerText = `${expiries.exp1.str} (${expiries.exp1.desc})`;
+                    document.getElementById('tab-sub-monthly').innerText = `${expiries.expM.str} (${expiries.expM.desc})`;
+                    document.getElementById('tab-sub-nextmonth').innerText = `${expiries.expNM.str} (${expiries.expNM.desc})`;
+
+                    document.getElementById('0dte-expiry-badge').innerText = `${expiries.exp0.str} · ${expiries.exp0.desc}`;
+                    document.getElementById('1dte-expiry-badge').innerText = `${expiries.exp1.str} · ${expiries.exp1.desc}`;
+                    document.getElementById('monthly-expiry-badge').innerText = `${expiries.expM.str} · ${expiries.expM.desc}`;
+                    document.getElementById('nextmonth-expiry-badge').innerText = `${expiries.expNM.str} · ${expiries.expNM.desc}`;
+
+                    runQuantEngine(msg.result, expiries.exp0, "0dte", "🔴 0DTE");
+                    runQuantEngine(msg.result, expiries.exp1, "1dte", "🔵 1DTE");
+                    runQuantEngine(msg.result, expiries.expM, "monthly", "🟣 당월물");
+                    runQuantEngine(msg.result, expiries.expNM, "nextmonth", "🟢 차월물");
+                    
+                    document.getElementById('val-update').innerText = new Date().toLocaleTimeString('ko-KR');
+                }
+            };
+
+            ws.onclose = function() {
+                if (quantTimer) { clearInterval(quantTimer); quantTimer = null; }
+                if (perpTimer) { clearInterval(perpTimer); perpTimer = null; }
+                const el = document.getElementById('ws-status');
+                el.className = "inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-red-950/60 text-red-400 border border-red-700/50";
+                el.innerHTML = '<span class="text-red-500 animate-pulse mr-1.5">●</span> 연결 끊김 (재연결 중)';
+                setTimeout(connectWS, 3000);
+            };
+        }
+
+        function fetchPerpTicker() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            ws.send(JSON.stringify({ "jsonrpc": "2.0", "id": 4, "method": "public/ticker", "params": { "instrument_name": "BTC-PERPETUAL" } }));
+        }
+
+        function fetchQuantData() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            ws.send(JSON.stringify({ "jsonrpc": "2.0", "id": 3, "method": "public/get_book_summary_by_currency", "params": { "currency": "BTC", "kind": "option" } }));
+        }
+
+        function renderDiffBadge(elId, diffVal, formatter, colorLogic = 'standard') {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            if (Math.abs(diffVal) < 1e-4) {
+                el.innerText = "-";
+                el.className = "text-[10px] font-mono text-gray-600";
+                return;
+            }
+            el.innerText = "Δ " + formatter(diffVal);
+            if (colorLogic === 'skew') {
+                el.className = `text-[10px] font-mono font-semibold ${diffVal > 0 ? 'text-down' : 'text-up'}`;
+            } else {
+                el.className = `text-[10px] font-mono font-semibold ${diffVal > 0 ? 'text-up' : 'text-down'}`;
+            }
+        }
+
+        function runQuantEngine(data, expInfo, prefixId, tierLabel) {
+            let options = [];
+            let strikes = new Set();
+            let callOiMap = {}; let putOiMap = {};
+            let callVolMap = {}; let putVolMap = {}; 
+            let underlyingPrices = [];
+
+            const searchKey = `-${expInfo.str}-`;
+
+            data.forEach(item => {
+                if (!item.instrument_name.includes(searchKey)) return;
+                let parts = item.instrument_name.split('-');
+                if (parts.length !== 4) return;
+
+                let strike = parseFloat(parts[2]);
+                let isCall = (parts[3] === 'C');
+                let oi = item.open_interest || 0;
+                let vol = item.volume || 0; 
+                let iv = (item.mark_iv || 0) / 100.0;
+                let underlying = item.underlying_price || item.estimated_delivery_price || 0;
+
+                if (underlying > 0) underlyingPrices.push(underlying);
+                strikes.add(strike);
+                options.push({ strike, isCall, oi, vol, iv, underlying });
+
+                if (isCall) {
+                    callOiMap[strike] = (callOiMap[strike] || 0) + oi;
+                    callVolMap[strike] = (callVolMap[strike] || 0) + vol;
+                } else {
+                    putOiMap[strike] = (putOiMap[strike] || 0) + oi;
+                    putVolMap[strike] = (putVolMap[strike] || 0) + vol;
+                }
+            });
+
+            if (options.length === 0) return; 
+
+            let btcRef = underlyingPrices.length > 0 ? (underlyingPrices.reduce((a, b) => a + b, 0) / underlyingPrices.length) : (btcPrice > 0 ? btcPrice : 0);
+
+            let totalCallOi = Object.values(callOiMap).reduce((a, b) => a + b, 0);
+            let totalPutOi = Object.values(putOiMap).reduce((a, b) => a + b, 0);
+            let pcr = totalCallOi > 0 ? (totalPutOi / totalCallOi) : 0;
+
+            let minPain = Infinity; let maxPainStrike = 0;
+            strikes.forEach(K => {
+                let pain = 0;
+                options.forEach(opt => {
+                    if (opt.isCall && K > opt.strike) pain += (K - opt.strike) * opt.oi;
+                    else if (!opt.isCall && K < opt.strike) pain += (opt.strike - K) * opt.oi;
+                });
+                if (pain < minPain) { minPain = pain; maxPainStrike = K; }
+            });
+
+            let now = new Date();
+            let T_years = Math.max((expInfo.dt.getTime() - now.getTime()) / (1000 * 3600 * 24 * 365), 0.0001);
+            
+            let netD = 0, netG = 0;
+            let netTheta = 0, netVega = 0, netVanna = 0, netCharm = 0;
+
+            options.forEach(opt => {
+                let S = opt.underlying || btcRef;
+                let greeks = calc_advanced_greeks(S, opt.strike, T_years, opt.iv, opt.isCall);
+                opt.delta = greeks.delta; 
+                
+                netD += greeks.delta * opt.oi;
+                
+                let gexMultiplier = opt.isCall ? 1.0 : -1.0;
+                let dollarGamma = (greeks.gamma * S * S * 0.01) * opt.oi * gexMultiplier;
+                netG += dollarGamma;
+                
+                netTheta += greeks.theta * opt.oi;
+                netVega += greeks.vega * opt.oi;
+                netVanna += greeks.vanna * opt.oi;
+                netCharm += greeks.charm * opt.oi;
+            });
+
+            let scanRange = 0.30;
+            let step = Math.max(50.0, Math.round(btcRef * 0.001));
+            let minPrice = btcRef * (1 - scanRange), maxPrice = btcRef * (1 + scanRange);
+            
+            let prevGex = null, prevNetD = null, prevPrice = null;
+            let gexCrossings = [], deltaCrossings = [];
+
+            for (let simPrice = minPrice; simPrice <= maxPrice; simPrice += step) {
+                let simNetD = 0, simNetGex = 0;
+                options.forEach(opt => {
+                    let simGreeks = calculate_greeks(simPrice, opt.strike, T_years, opt.iv, opt.isCall);
+                    simNetD += simGreeks.delta * opt.oi;
+                    simNetGex += (simGreeks.gamma * simPrice * simPrice * 0.01) * opt.oi * (opt.isCall ? 1.0 : -1.0);
+                });
+
+                if (prevNetD !== null && ((prevNetD < 0 && simNetD >= 0) || (prevNetD > 0 && simNetD <= 0)) && Math.abs(prevNetD - simNetD) > 0) {
+                    let ratio = Math.abs(prevNetD) / (Math.abs(prevNetD) + Math.abs(simNetD));
+                    deltaCrossings.push(prevPrice + ratio * step);
+                }
+
+                if (prevGex !== null && ((prevGex < 0 && simNetGex >= 0) || (prevGex > 0 && simNetGex <= 0)) && Math.abs(prevGex - simNetGex) > 0) {
+                    let ratio = Math.abs(prevGex) / (Math.abs(prevGex) + Math.abs(simNetGex));
+                    gexCrossings.push(prevPrice + ratio * step);
+                }
+
+                prevGex = simNetGex; 
+                prevNetD = simNetD;
+                prevPrice = simPrice;
+            }
+
+            let zeroDeltaPrice = deltaCrossings.length > 0 
+                ? deltaCrossings.reduce((prev, curr) => Math.abs(curr - btcRef) < Math.abs(prev - btcRef) ? curr : prev) 
+                : 0;
+
+            let zeroGammaPrice = gexCrossings.length > 0 
+                ? gexCrossings.reduce((prev, curr) => Math.abs(curr - btcRef) < Math.abs(prev - btcRef) ? curr : prev) 
+                : 0;
+
+            let activeCalls = options.filter(o => o.isCall && o.oi > 0 && o.iv > 0);
+            let activePuts = options.filter(o => !o.isCall && o.oi > 0 && o.iv > 0);
+            let skew = 0;
+            if (activeCalls.length > 0 && activePuts.length > 0) {
+                let call25 = activeCalls.reduce((prev, curr) => Math.abs(curr.delta - 0.25) < Math.abs(prev.delta - 0.25) ? curr : prev);
+                let put25 = activePuts.reduce((prev, curr) => Math.abs(curr.delta - (-0.25)) < Math.abs(prev.delta - (-0.25)) ? curr : prev);
+                skew = (put25.iv - call25.iv) * 100;
+            }
+
+            latestMetrics[prefixId] = {
+                maxPainStrike, zeroGammaPrice, zeroDeltaPrice, netG, netD, skew, pcr, netVega, netTheta, netVanna, netCharm
+            };
+
+            document.getElementById(`${prefixId}-maxpain`).innerText = fmtMoney(maxPainStrike);
+            document.getElementById(`${prefixId}-pcr`).innerText = pcr.toFixed(2);
+            
+            let skewEl = document.getElementById(`${prefixId}-skew`);
+            if(skewEl) {
+                skewEl.innerText = (skew > 0 ? "+" : "") + skew.toFixed(2) + "%";
+                skewEl.className = `text-lg font-bold font-mono ${skew > 0 ? 'text-down' : 'text-up'}`;
+            }
+            
+            let ndEl = document.getElementById(`${prefixId}-netdelta`);
+            let ndSubEl = document.getElementById(`${prefixId}-netdelta-sub`);
+            if(ndEl) {
+                ndEl.innerText = fmtLarge(netD) + " BTC";
+                ndEl.className = `text-lg font-bold font-mono ${netD >= 0 ? 'text-up' : 'text-down'}`;
+            }
+            if(ndSubEl) {
+                ndSubEl.innerText = netD >= 0 ? "롱 델타 우세 (상방)" : "숏 델타 우세 (하방)";
+            }
+            
+            let ngEl = document.getElementById(`${prefixId}-netgamma`);
+            let ngSubEl = document.getElementById(`${prefixId}-netgamma-sub`);
+            if(ngEl) {
+                ngEl.innerText = fmtLargeUSD(netG);
+                ngEl.className = `text-lg font-bold font-mono ${netG >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+            }
+            if(ngSubEl) {
+                ngSubEl.innerText = netG >= 0 ? "변동성 완화 (쿠션)" : "추세 가속 (스퀴즈)";
+            }
+
+            document.getElementById(`${prefixId}-netvega`).innerText = fmtLargeUSD(netVega) + " /1%";
+            document.getElementById(`${prefixId}-nettheta`).innerText = fmtLargeUSD(netTheta) + " /일";
+            document.getElementById(`${prefixId}-netvanna`).innerText = fmtLarge(netVanna) + " Δ/1%";
+            document.getElementById(`${prefixId}-netcharm`).innerText = fmtLarge(netCharm) + " Δ/일";
+
+            document.getElementById(`${prefixId}-zerodelta`).innerText = zeroDeltaPrice > 0 ? fmtMoney(zeroDeltaPrice) : "범위 외";
+            document.getElementById(`${prefixId}-zerogamma`).innerText = zeroGammaPrice > 0 ? fmtMoney(zeroGammaPrice) : "범위 외";
+
+            const snap = getSavedSnapshot();
+            if (snap && snap.tiers && snap.tiers[prefixId]) {
+                const prev = snap.tiers[prefixId];
+                renderDiffBadge(`${prefixId}-diff-maxpain`, maxPainStrike - prev.maxPainStrike, v => (v > 0 ? "+$" : "-$") + Math.abs(Math.round(v)));
+                renderDiffBadge(`${prefixId}-diff-zerogamma`, zeroGammaPrice - prev.zeroGammaPrice, v => (v > 0 ? "+$" : "-$") + Math.abs(Math.round(v)));
+                renderDiffBadge(`${prefixId}-diff-zerodelta`, zeroDeltaPrice - prev.zeroDeltaPrice, v => (v > 0 ? "+$" : "-$") + Math.abs(Math.round(v)));
+                renderDiffBadge(`${prefixId}-diff-netgamma`, netG - prev.netG, fmtLargeUSD);
+                renderDiffBadge(`${prefixId}-diff-netdelta`, netD - prev.netD, v => fmtLarge(v));
+                renderDiffBadge(`${prefixId}-diff-skew`, skew - prev.skew, v => (v > 0 ? "+" : "") + v.toFixed(2) + "%p", 'skew');
+                renderDiffBadge(`${prefixId}-diff-pcr`, pcr - prev.pcr, v => (v > 0 ? "+" : "") + v.toFixed(2), 'skew');
+                renderDiffBadge(`${prefixId}-diff-netvega`, netVega - prev.netVega, fmtLargeUSD);
+                renderDiffBadge(`${prefixId}-diff-nettheta`, netTheta - prev.netTheta, fmtLargeUSD);
+                renderDiffBadge(`${prefixId}-diff-netvanna`, netVanna - prev.netVanna, fmtLarge);
+                renderDiffBadge(`${prefixId}-diff-netcharm`, netCharm - prev.netCharm, fmtLarge);
+            }
+
+            let regimeBanner = document.getElementById(`${prefixId}-regime-banner`);
+            if (regimeBanner) {
+                if (netG >= 0) {
+                    regimeBanner.className = "w-full md:w-auto px-3.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-3 bg-emerald-950/40 border-emerald-500/40 text-emerald-300";
+                    regimeBanner.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span class="text-emerald-400">🛡️ [포지티브 감마] 변동성 억제 국면</span>
+                            <span class="text-gray-400 font-normal hidden sm:inline">| 상승 시 매도, 하락 시 매수 완충 작동</span>
+                        </div>
+                        <span class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold">C/P-Wall 쿠션 작동</span>
+                    `;
+                } else {
+                    regimeBanner.className = "w-full md:w-auto px-3.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-3 bg-rose-950/40 border-rose-500/40 text-rose-300";
+                    regimeBanner.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span class="text-rose-400">⚡ [네거티브 감마] 추세 가속/스퀴즈 국면</span>
+                            <span class="text-gray-400 font-normal hidden sm:inline">| 돌파 시 추격 매수/매도 수급 집중</span>
+                        </div>
+                        <span class="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">돌파시 연료화 경계</span>
+                    `;
+                }
+            }
+
+            let sortedCalls = Object.entries(callOiMap).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            let sortedPuts = Object.entries(putOiMap).sort((a,b) => b[1] - a[1]).slice(0, 10);
+
+            let topCWallStr = sortedCalls.length > 0 ? `${fmtMoney(parseFloat(sortedCalls[0][0]))} (${fmtNum(sortedCalls[0][1])})` : "-";
+            let topPWallStr = sortedPuts.length > 0 ? `${fmtMoney(parseFloat(sortedPuts[0][0]))} (${fmtNum(sortedPuts[0][1])})` : "-";
+
+            let sumRow = document.getElementById(`sum-row-${prefixId}`);
+            if (sumRow) {
+                sumRow.innerHTML = `
+                    <td class="py-1.5 px-2 font-bold text-white">${tierLabel} <span class="text-[10px] text-gray-500 font-normal">${expInfo.str}</span></td>
+                    <td class="py-1.5 px-2 font-bold text-yellow-400">${zeroGammaPrice > 0 ? fmtMoney(zeroGammaPrice) : '-'}</td>
+                    <td class="py-1.5 px-2 font-bold text-gray-200">${zeroDeltaPrice > 0 ? fmtMoney(zeroDeltaPrice) : '-'}</td>
+                    <td class="py-1.5 px-2 text-gray-400">${fmtMoney(maxPainStrike)}</td>
+                    <td class="py-1.5 px-2 font-bold ${netG >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${fmtLargeUSD(netG)}</td>
+                    <td class="py-1.5 px-2 font-bold ${netD >= 0 ? 'text-up' : 'text-down'}">${fmtLarge(netD)} BTC</td>
+                    <td class="py-1.5 px-2 font-bold ${skew > 0 ? 'text-down' : 'text-up'}">${(skew > 0 ? "+" : "") + skew.toFixed(2)}%</td>
+                    <td class="py-1.5 px-2"><span class="text-emerald-400">${topPWallStr}</span> <span class="text-gray-600">~</span> <span class="text-rose-400">${topCWallStr}</span></td>
+                `;
+            }
+
+            let renderOiTop10 = (sortedList, mapVol, elId, isCall) => {
+                if (sortedList.length === 0) {
+                    document.getElementById(elId).innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500 text-xs">- 데이터 없음 -</td></tr>`;
+                    return;
+                }
+
+                document.getElementById(elId).innerHTML = sortedList.map(([strikeStr, oi], idx) => {
+                    let strike = parseFloat(strikeStr);
+                    let vol = mapVol[strike] || 0;
+                    let rankBadge = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `<span class="text-gray-500 font-mono text-[11px]">${idx + 1}</span>`;
+                    let strikeColor = isCall ? "text-rose-300" : "text-emerald-300";
+
+                    return `
+                    <tr class="hover:bg-white/5 transition-colors">
+                        <td class="py-1.5 px-1 text-center">${rankBadge}</td>
+                        <td class="py-1.5 px-1 font-bold font-mono ${strikeColor}">${fmtMoney(strike)}</td>
+                        <td class="py-1.5 px-1 text-right font-mono text-gray-200 font-semibold">${fmtNum(oi)}</td>
+                        <td class="py-1.5 px-1 text-right font-mono text-orange-400/90">${fmtNum(vol)}</td>
+                    </tr>`;
+                }).join('');
+            };
+
+            renderOiTop10(sortedCalls, callVolMap, `${prefixId}-cwalls`, true);
+            renderOiTop10(sortedPuts, putVolMap, `${prefixId}-pwalls`, false);
+
+            let renderVolTop10 = (mapVol, mapOi, elId, isCall) => {
+                let filtered = Object.entries(mapVol).filter(w => w[1] > 0);
+                let sorted = filtered.sort((a,b) => b[1] - a[1]).slice(0, 10);
+                if (sorted.length === 0) {
+                    document.getElementById(elId).innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500 text-xs">- 거래 없음 -</td></tr>`;
+                    return;
+                }
+
+                document.getElementById(elId).innerHTML = sorted.map(([strikeStr, vol], idx) => {
+                    let strike = parseFloat(strikeStr);
+                    let oi = mapOi[strike] || 0;
+                    let turnover = oi > 0 ? ((vol / oi) * 100).toFixed(0) + "%" : "신규";
+                    
+                    let rankBadge = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `<span class="text-gray-500 font-mono text-[11px]">${idx + 1}</span>`;
+                    let strikeColor = isCall ? "text-orange-300" : "text-amber-300";
+
+                    return `
+                    <tr class="hover:bg-white/5 transition-colors">
+                        <td class="py-1.5 px-1 text-center">${rankBadge}</td>
+                        <td class="py-1.5 px-1 font-bold font-mono ${strikeColor}">${fmtMoney(strike)}</td>
+                        <td class="py-1.5 px-1 text-right font-bold font-mono text-orange-400">${fmtNum(vol)}</td>
+                        <td class="py-1.5 px-1 text-right font-mono text-gray-400 text-xs">${fmtNum(oi)}</td>
+                        <td class="py-1.5 px-1 text-center font-mono text-[11px] text-cyan-400 font-semibold" title="24h 거래량 / OI 비중">${turnover}</td>
+                    </tr>`;
+                }).join('');
+            };
+
+            renderVolTop10(callVolMap, callOiMap, `${prefixId}-cvol`, true);
+            renderVolTop10(putVolMap, putOiMap, `${prefixId}-pvol`, false);
+        }
+
+        connectWS();
+        pollBinancePerpREST();
+    </script>
+</body>
+</html>
