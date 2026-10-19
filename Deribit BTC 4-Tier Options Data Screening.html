@@ -275,6 +275,7 @@
 
     <script>
         const SNAPSHOT_KEY = "btc_4tier_quant_snapshot_v1";
+        const DIFF_KEYS = ['maxpain','zerogamma','zerodelta','netgamma','netdelta','skew','pcr','netvega','nettheta','netvanna','netcharm'];
         let latestMetrics = {};
         let currentDvol = 0;
         let perpPrice = 0;
@@ -676,6 +677,13 @@
             } catch (e) {}
         }
 
+        function clearTierDiffBadges(prefixId) {
+            DIFF_KEYS.forEach(k => {
+                const el = document.getElementById(`${prefixId}-diff-${k}`);
+                if (el) el.innerText = "";
+            });
+        }
+
         function updateSnapshotUI() {
             const snap = getSavedSnapshot();
             const btnText = document.getElementById('btn-snap-text');
@@ -685,19 +693,14 @@
             if (snap) {
                 btnText.innerText = `${snap.timeStr} 기준 갱신`;
                 btnClear.classList.remove('hidden');
-                banner.innerHTML = `<span class="text-indigo-400 font-semibold">📌 [${snap.timeStr}] 스냅샷 고정됨 (Spot $${Math.round(snap.btcPrice).toLocaleString()})</span> · 실시간 증감량(Δ) 표시 중`;
+                banner.innerHTML = `<span class="text-indigo-400 font-semibold">📌 [${snap.timeStr}] 스냅샷 고정됨 (Spot $${Math.round(snap.btcPrice).toLocaleString()})</span> · 만기 종목코드 기준 실시간 증감량(Δ) 추적 중`;
             } else {
                 btnText.innerText = "스냅샷 고정";
                 btnClear.classList.add('hidden');
                 banner.innerText = "📌 상단 [스냅샷 고정] 클릭 시 시점 대비 실시간 증감량(Δ)이 표시됩니다.";
                 document.getElementById('snap-diff-btc').innerText = "";
                 document.getElementById('snap-diff-dvol').innerText = "";
-                tiers.forEach(t => {
-                    ['maxpain','zerogamma','zerodelta','netgamma','netdelta','skew','pcr','netvega','nettheta','netvanna','netcharm'].forEach(k => {
-                        const el = document.getElementById(`${t.id}-diff-${k}`);
-                        if (el) el.innerText = "";
-                    });
-                });
+                tiers.forEach(t => clearTierDiffBadges(t.id));
             }
         }
 
@@ -821,7 +824,7 @@
                     }
                 }
 
-                // [신규 패치] 기존 데리비트 웹소켓을 통한 BTC-PERPETUAL 실시간 선물/베이시스/펀딩비 수신 (100% 작동 보장)
+                // 기존 데리비트 웹소켓을 통한 BTC-PERPETUAL 실시간 선물/베이시스/펀딩비 수신
                 if (msg.id === 4 && msg.result) {
                     const r = msg.result;
                     const deribitPerp = r.last_price || r.mark_price || 0;
@@ -846,6 +849,9 @@
                     document.getElementById('1dte-expiry-badge').innerText = `${expiries.exp1.str} · ${expiries.exp1.desc}`;
                     document.getElementById('monthly-expiry-badge').innerText = `${expiries.expM.str} · ${expiries.expM.desc}`;
                     document.getElementById('nextmonth-expiry-badge').innerText = `${expiries.expNM.str} · ${expiries.expNM.desc}`;
+
+                    // 만기 경과 종목이 메모리에 남지 않도록 최신 활성 만기 기준으로 갱신
+                    latestMetrics = {};
 
                     runQuantEngine(msg.result, expiries.exp0, "0dte", "🔴 0DTE");
                     runQuantEngine(msg.result, expiries.exp1, "1dte", "🔵 1DTE");
@@ -1014,7 +1020,8 @@
                 skew = (put25.iv - call25.iv) * 100;
             }
 
-            latestMetrics[prefixId] = {
+            // [핵심 수정] 고정 탭 이름(prefixId) 대신 만기일 코드(expInfo.str)를 키로 사용하여 만기 전환 시 스냅샷 자동 승계
+            latestMetrics[expInfo.str] = {
                 maxPainStrike, zeroGammaPrice, zeroDeltaPrice, netG, netD, skew, pcr, netVega, netTheta, netVanna, netCharm
             };
 
@@ -1055,9 +1062,10 @@
             document.getElementById(`${prefixId}-zerodelta`).innerText = zeroDeltaPrice > 0 ? fmtMoney(zeroDeltaPrice) : "범위 외";
             document.getElementById(`${prefixId}-zerogamma`).innerText = zeroGammaPrice > 0 ? fmtMoney(zeroGammaPrice) : "범위 외";
 
+            // [핵심 수정] 만기일 코드(expInfo.str) 기준으로 스냅샷 조회 및 미존재 시 배지 클리어
             const snap = getSavedSnapshot();
-            if (snap && snap.tiers && snap.tiers[prefixId]) {
-                const prev = snap.tiers[prefixId];
+            if (snap && snap.tiers && snap.tiers[expInfo.str]) {
+                const prev = snap.tiers[expInfo.str];
                 renderDiffBadge(`${prefixId}-diff-maxpain`, maxPainStrike - prev.maxPainStrike, v => (v > 0 ? "+$" : "-$") + Math.abs(Math.round(v)));
                 renderDiffBadge(`${prefixId}-diff-zerogamma`, zeroGammaPrice - prev.zeroGammaPrice, v => (v > 0 ? "+$" : "-$") + Math.abs(Math.round(v)));
                 renderDiffBadge(`${prefixId}-diff-zerodelta`, zeroDeltaPrice - prev.zeroDeltaPrice, v => (v > 0 ? "+$" : "-$") + Math.abs(Math.round(v)));
@@ -1069,6 +1077,8 @@
                 renderDiffBadge(`${prefixId}-diff-nettheta`, netTheta - prev.netTheta, fmtLargeUSD);
                 renderDiffBadge(`${prefixId}-diff-netvanna`, netVanna - prev.netVanna, fmtLarge);
                 renderDiffBadge(`${prefixId}-diff-netcharm`, netCharm - prev.netCharm, fmtLarge);
+            } else {
+                clearTierDiffBadges(prefixId);
             }
 
             let regimeBanner = document.getElementById(`${prefixId}-regime-banner`);
