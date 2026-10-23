@@ -251,12 +251,12 @@
                     </div>
                     <ul class="space-y-2 text-gray-400">
                         <li>
-                            <strong class="text-purple-300">Net Vanna (dΔ/dIV)</strong>:
-                            내재변동성 1% 변동 시 순 델타(BTC)의 민감도. <strong>IV 급락 시 숏커버링/덤핑 압력 유발</strong>.
+                            <strong class="text-purple-300">Net Vanna (딜러 바나 / dΔ/dIV)</strong>:
+                            딜러 포지션 기준 내재변동성(IV) 1% 변동 시 딜러 델타의 민감도. <strong>양수(+)일 때 IV 급락(Crush) 시 딜러의 숏 헤지 환매수(반등/상승 압력), IV 급등 시 헤지 매도 압력 유발</strong>.
                         </li>
                         <li>
-                            <strong class="text-emerald-300">Net Charm (dΔ/dt)</strong>:
-                            시간 경과(1일)에 따른 순 델타(BTC)의 감쇄 속도. <strong>만기 직전 헤징 포지션 자연 소멸 압력</strong>.
+                            <strong class="text-emerald-300">Net Charm (딜러 참 / dΔ/dt)</strong>:
+                            딜러 포지션 기준 시간 경과(1일)에 따른 딜러 델타의 감쇄 속도. <strong>만기 접근 시 외가격 옵션 델타가 소멸함에 따라 딜러의 기계적 헤지 리밸런싱(주말/만기 직전 수급 드리프트) 유발</strong>.
                         </li>
                         <li>
                             <strong class="text-cyan-300">Net Vega (d$ / dIV)</strong>:
@@ -486,15 +486,15 @@
                                     <span id="${t.id}-diff-nettheta" class="text-[10px] font-mono ml-1"></span>
                                 </div>
                             </div>
-                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="내재변동성(IV) 1% 변화 시 순 델타(BTC)의 변화량 (dΔ/dIV)">
-                                <span class="text-xs text-purple-400">Net Vanna (바나)</span>
+                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="딜러 포지션 기준 IV 1% 변동 시 딜러 순 델타(BTC) 변화량 (dΔ/dIV). 양수(+) 시 IV 급락 때 숏 헤지 환매수(상승 압력) 유발">
+                                <span class="text-xs text-purple-400">Net Vanna (딜러 바나)</span>
                                 <div class="text-right">
                                     <span class="text-xs font-bold font-mono text-purple-300" id="${t.id}-netvanna">--</span>
                                     <span id="${t.id}-diff-netvanna" class="text-[10px] font-mono ml-1"></span>
                                 </div>
                             </div>
-                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="하루(1일) 경과 시 순 델타(BTC)의 변화량 (dΔ/dt)">
-                                <span class="text-xs text-emerald-400">Net Charm (참)</span>
+                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="딜러 포지션 기준 1일 경과 시 딜러 순 델타(BTC) 변화량 (dΔ/dt). 만기 접근 시 시간가치 감쇄에 따른 딜러 헤지 리밸런싱 압력">
+                                <span class="text-xs text-emerald-400">Net Charm (딜러 참)</span>
                                 <div class="text-right">
                                     <span class="text-xs font-bold font-mono text-emerald-300" id="${t.id}-netcharm">--</span>
                                     <span id="${t.id}-diff-netcharm" class="text-[10px] font-mono ml-1"></span>
@@ -963,14 +963,16 @@
                 
                 netD += greeks.delta * opt.oi;
                 
-                let gexMultiplier = opt.isCall ? 1.0 : -1.0;
-                let dollarGamma = (greeks.gamma * S * S * 0.01) * opt.oi * gexMultiplier;
+                // 딜러 포지션 승수 (크립토 옵션 시장 수급: 콜 매도 우세 -> 딜러 Long Call(+1), 풋 매수 헤지 우세 -> 딜러 Short Put(-1))
+                let dealerMultiplier = opt.isCall ? 1.0 : -1.0;
+                let dollarGamma = (greeks.gamma * S * S * 0.01) * opt.oi * dealerMultiplier;
                 netG += dollarGamma;
                 
                 netTheta += greeks.theta * opt.oi;
                 netVega += greeks.vega * opt.oi;
-                netVanna += greeks.vanna * opt.oi;
-                netCharm += greeks.charm * opt.oi;
+                // [수정] Vanna와 Charm에 딜러 포지션 방향성(승수) 적용
+                netVanna += greeks.vanna * opt.oi * dealerMultiplier;
+                netCharm += greeks.charm * opt.oi * dealerMultiplier;
             });
 
             let scanRange = 0.30;
@@ -1056,8 +1058,16 @@
 
             document.getElementById(`${prefixId}-netvega`).innerText = fmtLargeUSD(netVega) + " /1%";
             document.getElementById(`${prefixId}-nettheta`).innerText = fmtLargeUSD(netTheta) + " /일";
-            document.getElementById(`${prefixId}-netvanna`).innerText = fmtLarge(netVanna) + " Δ/1%";
-            document.getElementById(`${prefixId}-netcharm`).innerText = fmtLarge(netCharm) + " Δ/일";
+            let vannaEl = document.getElementById(`${prefixId}-netvanna`);
+            if (vannaEl) {
+                vannaEl.innerText = fmtLarge(netVanna) + " Δ/1%";
+                vannaEl.className = `text-xs font-bold font-mono ${netVanna >= 0 ? 'text-purple-300' : 'text-purple-400'}`;
+            }
+            let charmEl = document.getElementById(`${prefixId}-netcharm`);
+            if (charmEl) {
+                charmEl.innerText = fmtLarge(netCharm) + " Δ/일";
+                charmEl.className = `text-xs font-bold font-mono ${netCharm >= 0 ? 'text-emerald-300' : 'text-emerald-400'}`;
+            }
 
             document.getElementById(`${prefixId}-zerodelta`).innerText = zeroDeltaPrice > 0 ? fmtMoney(zeroDeltaPrice) : "범위 외";
             document.getElementById(`${prefixId}-zerogamma`).innerText = zeroGammaPrice > 0 ? fmtMoney(zeroGammaPrice) : "범위 외";
