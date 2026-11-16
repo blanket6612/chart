@@ -430,7 +430,7 @@
         let priceRefMode = "cboe";
         let clockMode = "session";
         let dealerMode = "index";
-        let customProxy = localStorage.getItem("us_opt_custom_proxy") || "";
+        let customProxy = localStorage.getItem("us_opt_custom_proxy") || "/proxy?url=";
 
         let cboeSpotPrice = 0;
         let perpPrice = 0;
