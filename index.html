@@ -1,655 +1,1266 @@
 <!DOCTYPE html>
-<html lang="ko" style="font-size: 14.4px;">
+<html lang="ko" style="font-size: 14px;">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ BTC 4-Tier 미시구조 퀀트 터미널</title>
-    <!-- Tailwind CSS -->
+    <title>US Options Microstructure Terminal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0b0f19; color: #f8fafc; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; margin: 0; padding: 0; }
-        .card { background-color: #111827; border: 1px solid #1f2937; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
-        .text-up { color: #4ade80; }
-        .text-down { color: #f87171; }
-        
-        /* 탭 버튼 스타일 */
-        .tab-btn { transition: all 0.2s ease-in-out; }
-        .tab-active-0dte { background: rgba(248, 113, 113, 0.15) !important; color: #f87171 !important; border-color: #f87171 !important; box-shadow: 0 0 15px rgba(248, 113, 113, 0.25); }
-        .tab-active-1dte { background: rgba(96, 165, 250, 0.15) !important; color: #60a5fa !important; border-color: #60a5fa !important; box-shadow: 0 0 15px rgba(96, 165, 250, 0.25); }
-        .tab-active-monthly { background: rgba(192, 132, 252, 0.15) !important; color: #c084fc !important; border-color: #c084fc !important; box-shadow: 0 0 15px rgba(192, 132, 252, 0.25); }
-        .tab-active-nextmonth { background: rgba(45, 212, 191, 0.15) !important; color: #2dd4bf !important; border-color: #2dd4bf !important; box-shadow: 0 0 15px rgba(45, 212, 191, 0.25); }
+        :root {
+            --bg-base: #09090b;
+            --bg-panel: #111114;
+            --bg-elevated: #18181c;
+            --border-subtle: #222228;
+            --border-strong: #32323a;
+            --accent-pivot: #eab308;
+        }
 
-        /* 스크롤바 커스텀 */
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #0b0f19; }
-        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 2px; }
-        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+        body {
+            background-color: var(--bg-base);
+            color: #f4f4f5;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
 
-        /* 시세 플래시 애니메이션 */
-        .flash-btc { animation: flashBtc 0.5s ease-out; }
-        .flash-dvol { animation: flashDvol 0.5s ease-out; }
-        @keyframes flashBtc { 0% { background-color: rgba(234, 179, 8, 0.2); } 100% { background-color: transparent; } }
-        @keyframes flashDvol { 0% { background-color: rgba(156, 163, 175, 0.2); } 100% { background-color: transparent; } }
+        .font-num {
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+        }
+
+        .panel {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+        }
+
+        .metric-cell {
+            background-color: #141418;
+            border: 1px solid var(--border-subtle);
+            border-radius: 5px;
+            transition: border-color 0.15s ease;
+        }
+        .metric-cell:hover {
+            border-color: var(--border-strong);
+        }
+
+        .text-pos { color: #10b981; }
+        .text-neg { color: #f43f5e; }
+        .text-pivot { color: #eab308; }
+
+        /* 상단 고정 헤더 */
+        .sticky-frame {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background-color: rgba(9, 9, 11, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        /* 만기 탭 네비게이션 (모던 상단 인디케이터 방식) */
+        .tier-tab {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-subtle);
+            border-top: 2px solid transparent;
+            border-radius: 5px;
+            transition: all 0.15s ease;
+        }
+        .tier-tab:hover {
+            background-color: #151519;
+            border-color: var(--border-strong);
+        }
+        .tier-tab-active {
+            background-color: var(--bg-elevated) !important;
+            border-color: var(--border-strong) !important;
+            border-top-color: #eab308 !important;
+        }
+
+        /* 컨트롤 버튼 */
+        .ctrl-btn {
+            background-color: #16161a;
+            border: 1px solid #27272f;
+            color: #d4d4d8;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 5px 10px;
+            transition: all 0.15s ease;
+        }
+        .ctrl-btn:hover {
+            background-color: #222228;
+            border-color: #3f3f46;
+            color: #ffffff;
+        }
+
+        /* 시세 갱신 미세 하이라이트 */
+        .flash-spot { animation: flashNeutral 0.4s ease-out; }
+        .flash-perp { animation: flashNeutral 0.35s ease-out; }
+        @keyframes flashNeutral {
+            0% { background-color: rgba(255, 255, 255, 0.06); }
+            100% { background-color: transparent; }
+        }
+
+        /* 스크롤바 */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg-base); }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
     </style>
 </head>
-<body class="p-4 md:p-6 overflow-y-scroll">
+<body class="overflow-y-scroll">
 
-    <div class="max-w-[1600px] mx-auto space-y-5">
-        <!-- 1. 최상단 헤더 & 시세 / 선물 베이시스 / DVOL / 스냅샷 컨트롤 바 -->
-        <div class="flex flex-col xl:flex-row justify-between items-center pb-4 border-b border-gray-800 gap-4">
-            <div class="flex items-center justify-between w-full xl:w-auto gap-3">
-                <div class="flex items-center gap-3">
-                    <span class="text-3xl text-yellow-500 animate-pulse">⚡</span>
-                    <div>
-                        <h1 class="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                            BTC 미시구조 4-Tier 실시간 터미널
-                        </h1>
-                        <div class="text-xs text-gray-500 mt-0.5">OI 밀집 매물대 & 옵션 시장 넷 감마·델타 실시간 추적기</div>
+    <!-- 1. 상단 고정 프레임 -->
+    <header class="sticky-frame w-full">
+        <div class="max-w-[1640px] mx-auto px-4 md:px-6 py-2.5 space-y-2.5">
+            <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
+
+                <!-- 좌측: 타이틀 & 동적 워치리스트 & 제어 버튼 -->
+                <div class="flex flex-wrap items-center justify-between w-full xl:w-auto gap-3">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1 h-4 bg-[#eab308] rounded-sm inline-block"></span>
+                            <h1 class="text-base md:text-lg font-bold text-zinc-100 tracking-tight">
+                                <span id="title-symbol" class="font-num text-pivot">QQQ</span>
+                                <span class="font-medium text-zinc-400 text-sm ml-1">Options Microstructure</span>
+                            </h1>
+                        </div>
+
+                        <!-- 동적 티커 바 -->
+                        <div id="quick-sym-bar" class="flex items-center flex-wrap gap-0.5 bg-zinc-950 border border-zinc-800 rounded p-0.5 text-xs font-num"></div>
+
+                        <span id="cadence-badge" class="px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-800">만기주기 확인중</span>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button onclick="saveSnapshot()" class="ctrl-btn flex items-center gap-1.5" title="현재 시점 지표를 브라우저에 기록해 실시간 증감량(Δ)을 추적합니다">
+                            <span class="w-1.5 h-1.5 rounded-full bg-zinc-400 inline-block"></span>
+                            <span id="btn-snap-text">스냅샷 고정</span>
+                        </button>
+                        <button onclick="clearSnapshot()" id="btn-snap-clear" class="hidden ctrl-btn hover:!text-rose-400 hover:!border-rose-500/40" title="스냅샷 초기화">
+                            초기화
+                        </button>
+                        <button onclick="fetchCboeChain(true)" class="ctrl-btn" title="Cboe 옵션 체인 수동 갱신">
+                            갱신
+                        </button>
+                        <button onclick="toggleConfigBar()" class="ctrl-btn" title="파라미터 및 프록시 설정">
+                            설정
+                        </button>
+                        <label class="ctrl-btn cursor-pointer" title="로컬 Cboe JSON 파일 직접 불러오기">
+                            JSON 로드
+                            <input type="file" accept=".json" class="hidden" onchange="handleLocalJsonFile(event)">
+                        </label>
                     </div>
                 </div>
 
-                <!-- 스냅샷 컨트롤 (DB-less 시계열 비교기) -->
-                <div class="flex items-center gap-1.5 ml-2">
-                    <button onclick="saveSnapshot()" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-900/80 transition-colors flex items-center gap-1" title="현재 시점의 모든 지표를 브라우저에 고정하여 실시간 증감량(Δ)을 추적합니다">
-                        <span>📌</span> <span id="btn-snap-text">스냅샷 고정</span>
-                    </button>
-                    <button onclick="clearSnapshot()" id="btn-snap-clear" class="hidden px-2 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700 hover:text-rose-400 hover:border-rose-500/40 transition-colors" title="고정된 스냅샷 기준점을 초기화합니다">
-                        ✕
-                    </button>
+                <!-- 우측: 통합 시세 스트립 & 연동 상태 -->
+                <div class="flex flex-wrap items-center justify-between sm:justify-end w-full xl:w-auto gap-3">
+                    <div class="panel px-3 py-1.5 flex flex-wrap items-center divide-x divide-zinc-800/90">
+                        <!-- Cboe Spot -->
+                        <div class="pr-3.5 transition-colors rounded" id="spot-card" title="Cboe 옵션 체인 기준 기초자산 현물가 (15분 지연)">
+                            <div class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                                <span id="spot-label">QQQ SPOT</span>
+                                <span id="snap-diff-spot" class="font-num"></span>
+                            </div>
+                            <div class="text-base md:text-lg font-bold text-zinc-100 font-num leading-snug" id="val-spot">--</div>
+                        </div>
+
+                        <!-- Binance Perp & Basis -->
+                        <div class="px-3.5 transition-colors rounded" id="perp-card" title="바이낸스 TradFi 무기한 선물 실시간 시세 및 현물 대비 베이시스">
+                            <div class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                                <span id="perp-source-label">QQQUSDT PERP</span>
+                                <span id="val-basis" class="font-num px-1 py-0.2 rounded bg-zinc-800/80 text-zinc-400">BASIS --</span>
+                            </div>
+                            <div class="flex items-baseline gap-2 leading-snug">
+                                <div class="text-base md:text-lg font-bold text-zinc-100 font-num" id="val-perp">--</div>
+                                <span id="val-funding" class="text-[10px] font-num text-zinc-500" title="8시간 펀딩비율"></span>
+                            </div>
+                        </div>
+
+                        <!-- 30D ATM IV -->
+                        <div class="pl-3.5" id="iv-card" title="등가격 옵션에서 보간한 30일 연율화 내재변동성">
+                            <div class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                                <span>30D ATM IV</span>
+                                <span id="snap-diff-iv" class="font-num"></span>
+                            </div>
+                            <div class="text-base md:text-lg font-bold text-zinc-100 font-num leading-snug" id="val-iv">--</div>
+                        </div>
+                    </div>
+
+                    <!-- 상태 및 타이머 -->
+                    <div class="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-1">
+                        <div class="flex items-center gap-1.5">
+                            <span id="clock-mode-badge" class="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-800">세션 확인중</span>
+                            <div id="feed-status" class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-800">
+                                <span class="w-1.5 h-1.5 rounded-full bg-zinc-500 mr-1.5"></span>수신 중
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-zinc-500 font-num">
+                            UPDATED <span id="val-update" class="text-zinc-300">--:--:--</span>
+                            <span id="val-countdown" class="text-zinc-600 ml-1">(5:00)</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- 실시간 시세 (Deribit Spot + Perp/Basis + DVOL) -->
-            <div class="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-end">
-                <!-- Deribit 현물 인덱스 -->
-                <div class="card py-2 px-3.5 flex items-center gap-2.5 border-yellow-500/40 bg-yellow-500/5 flex-1 sm:flex-none" id="btc-card" title="Deribit 현물 인덱스 실시간 가격 (Underlying Spot)">
-                    <span class="text-xl text-yellow-500">₿</span>
+            <!-- 접이식 파라미터 설정 바 -->
+            <div id="config-bar" class="hidden panel p-3 bg-zinc-950/95 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-2.5 items-end">
                     <div>
-                        <div class="text-[10px] text-gray-400 font-semibold uppercase flex items-center gap-1.5">
-                            <span>Underlying Spot</span>
-                            <span id="snap-diff-btc" class="text-[10px] font-mono"></span>
+                        <label class="block text-[11px] text-zinc-400 mb-1">티커 조회 (성공 시 상단 추가)</label>
+                        <div class="flex gap-1">
+                            <input id="inp-custom-sym" type="text" value="QQQ" onkeydown="if(event.key==='Enter') applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-100 uppercase">
+                            <button onclick="applyCustomParams()" class="px-2.5 py-1 bg-[#eab308] hover:bg-amber-400 text-zinc-950 font-semibold rounded shrink-0 transition-colors">적용</button>
                         </div>
-                        <div class="text-xl font-black text-yellow-400 font-mono tracking-tight" id="val-btc">--</div>
                     </div>
-                </div>
-
-                <!-- 무기한 선물 & 실시간 베이시스 (데리비트 WS 직결 + 바이낸스 하이브리드) -->
-                <div class="card py-2 px-3.5 flex items-center gap-2.5 border-amber-500/30 bg-gray-900/60 flex-1 sm:flex-none" id="perp-card" title="무기한 선물 실시간 체결가 및 현물 지수 대비 베이시스(Perp - Spot)">
-                    <span class="text-lg text-amber-400">⚡</span>
                     <div>
-                        <div class="text-[10px] text-gray-400 font-semibold uppercase flex items-center gap-1.5">
-                            <span id="perp-source-label">BTC PERP</span>
-                            <span id="val-basis" class="text-[10px] font-mono px-1 rounded bg-gray-800 text-gray-300">Basis --</span>
-                        </div>
-                        <div class="flex items-baseline gap-2">
-                            <div class="text-xl font-bold text-amber-300 font-mono tracking-tight" id="val-perp">--</div>
-                            <span id="val-funding" class="text-[10px] font-mono text-gray-400" title="8시간 기준 펀딩비율"></span>
-                        </div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">상단 티커 편집 (쉼표 구분)</label>
+                        <input id="inp-watchlist" type="text" value="QQQ, NVDA, ADBE" onchange="syncWatchlistFromInput()" onkeydown="if(event.key==='Enter') syncWatchlistFromInput()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-200 uppercase">
                     </div>
-                </div>
-
-                <!-- Deribit DVOL -->
-                <div class="card py-2 px-3.5 flex items-center gap-2.5 border-gray-700 bg-gray-900/60 flex-1 sm:flex-none" id="dvol-card" title="Deribit 30일 옵션 내재변동성을 1년 단위(연율화)로 환산한 공포·변동성 지수">
-                    <span class="text-xl text-gray-400">📈</span>
                     <div>
-                        <div class="text-[10px] text-gray-400 font-semibold uppercase flex items-center gap-1.5">
-                            <span>DVOL (30d IV)</span>
-                            <span id="snap-diff-dvol" class="text-[10px] font-mono"></span>
-                        </div>
-                        <div class="text-xl font-bold text-white font-mono" id="val-dvol">--</div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">무위험 금리 r (연 %)</label>
+                        <input id="inp-rate" type="number" step="0.01" value="4.32" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-100">
                     </div>
-                </div>
-
-                <div class="text-right pl-1 hidden sm:block">
-                    <div id="ws-status" class="inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700">
-                        <span class="text-yellow-500 animate-pulse mr-1.5">●</span> 연결 준비 중
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">배당수익률 q (연 %)</label>
+                        <input id="inp-div" type="number" step="0.01" value="0.45" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-100">
                     </div>
-                    <div class="text-[11px] text-gray-500 mt-1 font-mono">연산: <span id="val-update" class="text-gray-300">--:--:--</span></div>
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">기초자산(S) 기준</label>
+                        <select id="sel-price-ref" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-zinc-200 outline-none">
+                            <option value="cboe">Cboe Spot (IV 정합성 우선)</option>
+                            <option value="perp">Binance Perp (비정규장 반영)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">잔존만기(T) 시계 보정</label>
+                        <select id="sel-clock-mode" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-zinc-200 outline-none">
+                            <option value="session">휴장 시 직전 마감 고정 (권장)</option>
+                            <option value="realtime">실시간 시계 (주말 감쇄 반영)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">딜러 GEX 부호 모델</label>
+                        <select id="sel-dealer-mode" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-zinc-200 outline-none">
+                            <option value="index">지수·ETF 표준 (Call +1 / Put -1)</option>
+                            <option value="momentum">콜 매수 우위형 (Call -1 / Put -1)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">커스텀 CORS 프록시</label>
+                        <input id="inp-proxy" type="text" placeholder="http://127.0.0.1:8080/proxy?url=" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-300">
+                    </div>
                 </div>
             </div>
         </div>
+    </header>
 
-        <!-- 1.5 4-Tier 멀티 만기 핵심 레벨 한눈에 비교 바 (단타/스윙 변곡점 통합 관측용) -->
-        <div class="card p-3 border-gray-800 bg-[#0f172a]/80">
-            <div class="flex justify-between items-center mb-2 px-1">
-                <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5">
-                    <span>🔭</span> 4-Tier 만기별 핵심 레벨 & 수급 요약 (Cross-Tier Confluence)
+    <!-- 메인 본문 -->
+    <main class="max-w-[1640px] mx-auto px-4 md:px-6 py-5 space-y-4">
+
+        <!-- 1.5 만기별 핵심 레벨 통합 비교 테이블 -->
+        <section class="panel p-3.5">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2.5 gap-1">
+                <div class="text-xs font-semibold tracking-tight flex items-center gap-2">
+                    <span class="text-pivot">4-TIER CROSS-EXPIRY SUMMARY</span>
+                    <span class="text-[11px] font-normal text-zinc-500">승수 ×100 반영</span>
                 </div>
-                <div id="snap-status-banner" class="text-[11px] text-gray-500 font-mono">
-                    📌 상단 [스냅샷 고정] 클릭 시 시점 대비 실시간 증감량(Δ)이 표시됩니다.
+                <div id="snap-status-banner" class="text-[11px] text-zinc-500">
+                    스냅샷 미설정 · OI: OCC 개장 전 정산 / 거래량·IV: 15분 지연
                 </div>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs font-mono">
+                <table class="w-full text-left text-xs">
                     <thead>
-                        <tr class="text-[10px] text-gray-500 border-b border-gray-800">
-                            <th class="py-1 px-2">만기 구분</th>
-                            <th class="py-1 px-2 text-yellow-400">🧲 Zero Γ (플립선)</th>
-                            <th class="py-1 px-2 text-gray-300">📍 Zero Δ (수렴선)</th>
-                            <th class="py-1 px-2 text-gray-400">🎯 MaxPain</th>
-                            <th class="py-1 px-2">⚡ Net Γ ($ GEX)</th>
-                            <th class="py-1 px-2">🧭 Net Δ (플레이어)</th>
-                            <th class="py-1 px-2">🌪️ 25D Skew</th>
-                            <th class="py-1 px-2">🛡️ 1순위 P-Wall ~ C-Wall</th>
+                        <tr class="text-[11px] text-zinc-500 border-b border-zinc-800 uppercase tracking-wider">
+                            <th class="py-1.5 px-2 font-medium">만기 구분</th>
+                            <th class="py-1.5 px-2 font-medium text-pivot">Zero Γ (플립)</th>
+                            <th class="py-1.5 px-2 font-medium">Zero Δ (수렴)</th>
+                            <th class="py-1.5 px-2 font-medium">Max Pain</th>
+                            <th class="py-1.5 px-2 font-medium">Net Γ ($ GEX)</th>
+                            <th class="py-1.5 px-2 font-medium">Net Δ (주식수)</th>
+                            <th class="py-1.5 px-2 font-medium">25D Skew</th>
+                            <th class="py-1.5 px-2 font-medium">1순위 P-Wall – C-Wall</th>
                         </tr>
                     </thead>
-                    <tbody id="cross-tier-summary" class="divide-y divide-gray-800/50 text-xs">
-                        <tr id="sum-row-0dte" class="hover:bg-white/5 cursor-pointer" onclick="switchTab('0dte')"><td colspan="8" class="py-1.5 px-2 text-gray-500">데이터 연산 대기 중...</td></tr>
-                        <tr id="sum-row-1dte" class="hover:bg-white/5 cursor-pointer" onclick="switchTab('1dte')"></tr>
-                        <tr id="sum-row-monthly" class="hover:bg-white/5 cursor-pointer" onclick="switchTab('monthly')"></tr>
-                        <tr id="sum-row-nextmonth" class="hover:bg-white/5 cursor-pointer" onclick="switchTab('nextmonth')"></tr>
+                    <tbody id="cross-tier-summary" class="divide-y divide-zinc-800/60 font-num text-xs">
+                        <tr id="sum-row-0dte" class="hover:bg-zinc-800/40 cursor-pointer transition-colors" onclick="switchTab('0dte')">
+                            <td colspan="8" class="py-2 px-2 text-zinc-500 font-sans">옵션 체인 수신 대기 중...</td>
+                        </tr>
+                        <tr id="sum-row-1dte" class="hover:bg-zinc-800/40 cursor-pointer transition-colors" onclick="switchTab('1dte')"></tr>
+                        <tr id="sum-row-monthly" class="hover:bg-zinc-800/40 cursor-pointer transition-colors" onclick="switchTab('monthly')"></tr>
+                        <tr id="sum-row-nextmonth" class="hover:bg-zinc-800/40 cursor-pointer transition-colors" onclick="switchTab('nextmonth')"></tr>
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
 
-        <!-- 2. 상단 만기별 카테고리 탭 네비게이션 -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            <button onclick="switchTab('0dte')" id="btn-tab-0dte" class="tab-btn card py-3 px-4 text-center border-gray-800 hover:border-red-500/50 flex flex-col items-center justify-center gap-1 tab-active-0dte" title="당일 오후 5시(KST) 만기 도래 상품. 초단기 데이트레이딩 및 핀닝 관측">
-                <div class="text-sm font-bold flex items-center gap-1.5">
-                    <span>🔴 0DTE (당일물)</span>
+        <!-- 2. 4-Tier 탭 네비게이션 -->
+        <nav class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <button onclick="switchTab('0dte')" id="btn-tab-0dte" class="tier-tab py-2.5 px-3.5 text-left tier-tab-active">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-pivot" id="tab-title-0dte">최근접물 (0DTE)</span>
+                    <span class="text-[10px] font-num text-zinc-500">T1</span>
                 </div>
-                <div class="text-[11px] text-gray-400 font-mono" id="tab-sub-0dte">만기 로딩중...</div>
+                <div class="text-[11px] text-zinc-400 font-num mt-0.5" id="tab-sub-0dte">탐색중...</div>
             </button>
 
-            <button onclick="switchTab('1dte')" id="btn-tab-1dte" class="tab-btn card py-3 px-4 text-center border-gray-800 hover:border-blue-500/50 flex flex-col items-center justify-center gap-1 opacity-70" title="내일 오후 5시(KST) 만기 상품. 당일물 직후 형성될 단기 포지션 관측">
-                <div class="text-sm font-bold flex items-center gap-1.5">
-                    <span>🔵 1DTE (차일물)</span>
+            <button onclick="switchTab('1dte')" id="btn-tab-1dte" class="tier-tab py-2.5 px-3.5 text-left opacity-75">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-pivot" id="tab-title-1dte">차근접물 (1DTE)</span>
+                    <span class="text-[10px] font-num text-zinc-500">T2</span>
                 </div>
-                <div class="text-[11px] text-gray-400 font-mono" id="tab-sub-1dte">만기 로딩중...</div>
+                <div class="text-[11px] text-zinc-400 font-num mt-0.5" id="tab-sub-1dte">탐색중...</div>
             </button>
 
-            <button onclick="switchTab('monthly')" id="btn-tab-monthly" class="tab-btn card py-3 px-4 text-center border-gray-800 hover:border-purple-500/50 flex flex-col items-center justify-center gap-1 opacity-70" title="당월 마지막 주 금요일 만기 상품. 중기 스윙 매물대 및 거시 감마 레짐">
-                <div class="text-sm font-bold flex items-center gap-1.5">
-                    <span>🟣 당월물 (Monthly)</span>
+            <button onclick="switchTab('monthly')" id="btn-tab-monthly" class="tier-tab py-2.5 px-3.5 text-left opacity-75">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-pivot" id="tab-title-monthly">당월물 (Monthly)</span>
+                    <span class="text-[10px] font-num text-zinc-500">T3</span>
                 </div>
-                <div class="text-[11px] text-gray-400 font-mono" id="tab-sub-monthly">만기 로딩중...</div>
+                <div class="text-[11px] text-zinc-400 font-num mt-0.5" id="tab-sub-monthly">탐색중...</div>
             </button>
 
-            <button onclick="switchTab('nextmonth')" id="btn-tab-nextmonth" class="tab-btn card py-3 px-4 text-center border-gray-800 hover:border-teal-500/50 flex flex-col items-center justify-center gap-1 opacity-70" title="익월 마지막 주 금요일 만기 상품. 기관들의 장기 롤오버 및 거시 헤지">
-                <div class="text-sm font-bold flex items-center gap-1.5">
-                    <span>🟢 차월물 (Next Month)</span>
+            <button onclick="switchTab('nextmonth')" id="btn-tab-nextmonth" class="tier-tab py-2.5 px-3.5 text-left opacity-75">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-pivot" id="tab-title-nextmonth">차월물 (Next Monthly)</span>
+                    <span class="text-[10px] font-num text-zinc-500">T4</span>
                 </div>
-                <div class="text-[11px] text-gray-400 font-mono" id="tab-sub-nextmonth">만기 로딩중...</div>
+                <div class="text-[11px] text-zinc-400 font-num mt-0.5" id="tab-sub-nextmonth">탐색중...</div>
             </button>
-        </div>
+        </nav>
 
-        <!-- 3. 대시보드 메인 패널 컨테이너 -->
+        <!-- 3. 메인 패널 컨테이너 -->
         <div id="panels-container"></div>
 
-        <!-- 4. 하단 미시구조 지표 상세 가이드 -->
-        <div class="card p-5 border-gray-800 bg-[#0f172a]/70">
-            <div class="flex items-center gap-2 pb-3 mb-4 border-b border-gray-800">
-                <span class="text-base text-yellow-500">📖</span>
-                <h3 class="text-sm font-bold text-white tracking-wide">터미널 핵심 용어 및 지표 판별 가이드</h3>
-                <span class="text-xs text-gray-500 font-normal">| 화면의 각 항목에 마우스를 올리면 간이 툴팁이 표시됩니다.</span>
+        <!-- 4. 하단 미시구조 레퍼런스 가이드 -->
+        <footer class="panel p-5">
+            <div class="flex flex-wrap items-center justify-between pb-3 mb-4 border-b border-zinc-800/80 gap-2">
+                <h3 class="text-xs font-semibold text-pivot uppercase tracking-wider">Microstructure Reference Guide</h3>
+                <span class="text-[11px] text-zinc-500">BSM 배당·금리 보정 · 세션 시계 동기화 · 옵션 승수(×100주) 적용</span>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-                <!-- 1열: 매물대 구조 & 회전율 -->
-                <div class="space-y-2.5">
-                    <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5 border-b border-gray-800/80 pb-1.5">
-                        <span class="text-emerald-400">🛡️</span> 매물대 구조 & 24h 회전율
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs leading-relaxed">
+                <div class="space-y-2">
+                    <div class="text-[11px] font-semibold text-pivot uppercase tracking-wider pb-1 border-b border-zinc-800/60">
+                        01. 정산 OI 및 장중 회전율 해석
                     </div>
-                    <ul class="space-y-2 text-gray-400">
-                        <li>
-                            <strong class="text-rose-400">🔴 C-Wall (저항 매물대)</strong>:
-                            콜옵션 미결제약정(OI)이 가장 많이 집중된 상단 행사가.
-                        </li>
-                        <li>
-                            <strong class="text-emerald-400">🟢 P-Wall (지지 매물대)</strong>:
-                            풋옵션 미결제약정(OI)이 가장 많이 집중된 하단 행사가.
-                        </li>
-                        <li>
-                            <strong class="text-cyan-400">⚡ 회전율 (24h Vol / OI)</strong>:
-                            현재 잔고 대비 최근 24시간 동안 체결된 거래량 비중.
-                        </li>
-                        <li>
-                            <strong class="text-amber-300">🔥 Vol Top 10 (격전지)</strong>:
-                            최근 24시간 동안 실시간으로 자금이 가장 거세게 쏠린 스트라이크.
-                        </li>
+                    <ul class="space-y-1.5 text-zinc-400">
+                        <li><strong class="text-zinc-200 font-medium">C-Wall / P-Wall</strong>: OCC가 개장 전 정산한 누적 미결제약정 상위 행사가입니다. 누적 재고가 두터운 당월·차월물에서 거시 지지·저항 신뢰도가 높습니다.</li>
+                        <li><strong class="text-zinc-200 font-medium">개장 전 단기물 시차</strong>: 휴장 중에는 직전 정규장 대량 거래량이 아직 캐시 OI에 합산되기 전일 수 있으므로, 미정산 배지 표시 시 우측 거래량 상위 행사가를 함께 확인합니다.</li>
+                        <li><strong class="text-zinc-200 font-medium">회전율 (Vol / OI)</strong>: 100% 초과 행사가는 기존 청산만으로 설명되지 않는 당일 신규 포지션 유입 및 핵심 격전지를 의미합니다.</li>
                     </ul>
                 </div>
 
-                <!-- 2열: 상단 7대 미시구조 지표 -->
-                <div class="space-y-2.5">
-                    <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5 border-b border-gray-800/80 pb-1.5">
-                        <span class="text-yellow-400">📊</span> 핵심 지표 (Greeks & 수급)
+                <div class="space-y-2">
+                    <div class="text-[11px] font-semibold text-pivot uppercase tracking-wider pb-1 border-b border-zinc-800/60">
+                        02. 핵심 감마·델타 변곡점
                     </div>
-                    <ul class="space-y-2 text-gray-400">
-                        <li>
-                            <strong class="text-yellow-400">🎯 MaxPain (맥스페인)</strong>:
-                            옵션 매수자의 손실이 최대화되어 <strong>옵션 매도자/발행자의 수익이 극대화되는 가격</strong>. 만기 직전 가격 자석 역할.
-                        </li>
-                        <li>
-                            <strong class="text-yellow-400">🧲 Zero Γ (감마 플립)</strong>:
-                            넷 감마 노출이 0이 되는 분기점. <strong>상회 시 횡보/쿠션 장세, 하향 이탈 시 급격한 추세 가속(스퀴즈)</strong> 촉발.
-                        </li>
-                        <li>
-                            <strong class="text-gray-200">📍 Zero Δ (델타 수렴)</strong>:
-                            시장 넷 델타 노출이 0이 되는 지점. 상/하방 델타 리스크가 중립화되는 균형 가격.
-                        </li>
-                        <li>
-                            <strong class="text-emerald-400">Net Γ ($ GEX / 1%)</strong>:
-                            기초자산 1% 변동 시 딜러 헤징 요구 명목 달러 규모. 양수(+)면 변동성 완화, 음수(-)면 스퀴즈 연료.
-                        </li>
-                        <li>
-                            <strong class="text-gray-200">🧭 Net Δ (시장 순 델타)</strong>:
-                            시장 전체 미결제약정 누적 델타 합계(BTC). <strong>양수(+)는 롱 델타 우세, 음수(-)는 숏 델타 우세</strong>.
-                        </li>
-                        <li>
-                            <strong class="text-gray-200">🌪️ 25D Skew</strong>:
-                            25델타 풋과 콜의 내재변동성 스프레드. <strong>양수(+)는 하방 풋 헤지 수요 우세, 음수(-)는 상방 콜 베팅 우세</strong>.
-                        </li>
+                    <ul class="space-y-1.5 text-zinc-400">
+                        <li><strong class="text-zinc-200 font-medium">Zero Γ (감마 플립)</strong>: 딜러 순감마 노출($ GEX)이 0이 되는 분기점입니다. 상회 시 역추세 완충 헤징으로 변동성이 억제되며, 하회 시 추세 추종 헤징이 가세합니다.</li>
+                        <li><strong class="text-zinc-200 font-medium">딜러 부호 모델</strong>: 지수 ETF(QQQ·SPY)는 콜 매도·풋 헤지 구조인 표준 모델(Call +1 / Put -1)이 적합하며, 콜 매수 쏠림이 강한 개별주는 설정에서 대조할 수 있습니다.</li>
+                        <li><strong class="text-zinc-200 font-medium">Net Δ (환산 주식수)</strong>: 전체 옵션 OI 델타 합계에 100주를 곱한 시장 순 델타 노출 규모입니다.</li>
                     </ul>
                 </div>
 
-                <!-- 3열: 2차 그릭스 & 시장 심리 -->
-                <div class="space-y-2.5">
-                    <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5 border-b border-gray-800/80 pb-1.5">
-                        <span class="text-blue-400">🌪️</span> 교차 그릭스 & 시장 심리
+                <div class="space-y-2">
+                    <div class="text-[11px] font-semibold text-pivot uppercase tracking-wider pb-1 border-b border-zinc-800/60">
+                        03. 세션 시계 및 2차 교차 그릭스
                     </div>
-                    <ul class="space-y-2 text-gray-400">
-                        <li>
-                            <strong class="text-purple-300">Net Vanna (딜러 바나 / dΔ/dIV)</strong>:
-                            딜러 포지션 기준 내재변동성(IV) 1% 변동 시 딜러 델타의 민감도. <strong>양수(+)일 때 IV 급락(Crush) 시 딜러의 숏 헤지 환매수(반등/상승 압력), IV 급등 시 헤지 매도 압력 유발</strong>.
-                        </li>
-                        <li>
-                            <strong class="text-emerald-300">Net Charm (딜러 참 / dΔ/dt)</strong>:
-                            딜러 포지션 기준 시간 경과(1일)에 따른 딜러 델타의 감쇄 속도. <strong>만기 접근 시 외가격 옵션 델타가 소멸함에 따라 딜러의 기계적 헤지 리밸런싱(주말/만기 직전 수급 드리프트) 유발</strong>.
-                        </li>
-                        <li>
-                            <strong class="text-cyan-300">Net Vega (d$ / dIV)</strong>:
-                            내재변동성 1% 변동 시 전체 옵션 포지션의 명목 가치 변화량($).
-                        </li>
-                        <li>
-                            <strong class="text-gray-200">⚖️ PCR (Put-Call Ratio)</strong>:
-                            전체 풋옵션 미결제약정을 콜옵션으로 나눈 값. 1.0 초과 시 시장에 하방 방어 계약이 더 많음을 시사.
-                        </li>
+                    <ul class="space-y-1.5 text-zinc-400">
+                        <li><strong class="text-zinc-200 font-medium">휴장 시 마감 고정</strong>: 야간·주말에는 옵션 IV가 직전 정규장 마감치로 고정되므로 잔존만기(T) 역시 직전 마감 시각으로 고정해 단기 세타·참 왜곡을 방지합니다.</li>
+                        <li><strong class="text-zinc-200 font-medium">Net Vanna (dΔ/dIV)</strong>: 내재변동성 1%p 변화당 딜러 델타 변화량입니다. 양수(+) 상태에서 이벤트 해소 후 IV 급락 시 기계적 환매수 압력을 유발합니다.</li>
+                        <li><strong class="text-zinc-200 font-medium">Net Charm (dΔ/dt)</strong>: 1거래일 경과에 따른 외가격 옵션 델타 소멸과 딜러 리밸런싱 추정 물량입니다.</li>
                     </ul>
                 </div>
             </div>
-        </div>
-
-    </div>
+        </footer>
+    </main>
 
     <script>
-        const SNAPSHOT_KEY = "btc_4tier_quant_snapshot_v1";
+        // ================= 상수, 휴장일 캘린더 및 기본 매핑 =================
+        const CONTRACT_MULTIPLIER = 100;
+        const POLL_INTERVAL_MS = 300000; // 5분 주기
+        const WATCHLIST_STORAGE_KEY = "us_opt_quick_watchlist_v1";
         const DIFF_KEYS = ['maxpain','zerogamma','zerodelta','netgamma','netdelta','skew','pcr','netvega','nettheta','netvanna','netcharm'];
-        let latestMetrics = {};
-        let currentDvol = 0;
-        let perpPrice = 0;
-        let binanceActive = false;
 
-        const fmtMoney = (val) => "$" + val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        
-        // 순수 수치 포맷터 (K, M, B)
+        const US_MARKET_HOLIDAYS = new Set([
+            "2026-01-01","2026-01-19","2026-02-16","2026-04-03","2026-05-25",
+            "2026-06-19","2026-07-03","2026-09-07","2026-11-26","2026-12-25",
+            "2027-01-01","2027-01-18","2027-02-15","2027-03-26","2027-05-31",
+            "2027-06-18","2027-07-05","2027-09-06","2027-11-25","2027-12-24"
+        ]);
+
+        const TICKER_TYPO_MAP = {
+            "APPL": "AAPL", "TESLA": "TSLA", "GOOGLE": "GOOGL", "NVIDIA": "NVDA", "BRK.B": "BRKB"
+        };
+        const CBOE_INDEX_SET = new Set(["SPX", "NDX", "VIX", "RUT", "DJX", "XSP"]);
+
+        const DEFAULT_DIV_MAP = {
+            "QQQ": 0.0045, "SPY": 0.0120, "DIA": 0.0150, "IWM": 0.0110, "SPX": 0.0125, "NDX": 0.0055,
+            "NVDA": 0.0003, "AAPL": 0.0044, "MSFT": 0.0072, "AMZN": 0.0000, "GOOGL": 0.0045,
+            "META": 0.0033, "TSLA": 0.0000, "AVGO": 0.0115, "AMD": 0.0000, "ADBE": 0.0000,
+            "NFLX": 0.0000, "COST": 0.0052, "COIN": 0.0000, "MSTR": 0.0000, "IBIT": 0.0000
+        };
+
+        // ================= 워치리스트 로드 및 상태 변수 =================
+        function loadWatchlist() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(WATCHLIST_STORAGE_KEY));
+                if (Array.isArray(saved) && saved.length > 0 && saved[0].sym) return saved;
+            } catch (e) {}
+            return [
+                { sym: "QQQ", q: 0.0045 },
+                { sym: "NVDA", q: 0.0003 },
+                { sym: "ADBE", q: 0.0000 }
+            ];
+        }
+
+        let quickWatchlist = loadWatchlist();
+        let currentSymbol = quickWatchlist[0].sym;
+        let currentActiveTab = "0dte";
+        let riskFreeRate = 0.0432;
+        let dividendYield = quickWatchlist[0].q ?? 0.0045;
+        let priceRefMode = "cboe";
+        let clockMode = "session";
+        let dealerMode = "index";
+        let customProxy = localStorage.getItem("us_opt_custom_proxy") || "";
+
+        let cboeSpotPrice = 0;
+        let perpPrice = 0;
+        let currentAtmIv30 = 0;
+        let rawCboeChain = null;
+        let latestMetrics = {};
+
+        let binanceWs = null;
+        let binanceRestTimer = null;
+        let cboePollTimer = null;
+        let countdownTimer = null;
+        let nextPollAt = 0;
+        let preferredProxyIdx = 0;
+
+        // ================= 동적 상단 티커 바 관리 =================
+        function saveWatchlist() {
+            try { localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(quickWatchlist)); } catch (e) {}
+            const wlInput = document.getElementById('inp-watchlist');
+            if (wlInput) wlInput.value = quickWatchlist.map(x => x.sym).join(', ');
+        }
+
+        function renderQuickSymbolBar() {
+            const bar = document.getElementById('quick-sym-bar');
+            if (!bar) return;
+
+            bar.innerHTML = quickWatchlist.map(item => {
+                const isActive = (item.sym === currentSymbol);
+                const btnCls = isActive
+                    ? "bg-[#eab308] text-zinc-950 font-semibold"
+                    : "text-pivot hover:text-amber-300 hover:bg-zinc-800/70";
+                const delBtn = quickWatchlist.length > 1
+                    ? `<span onclick="removeQuickSymbol(event, '${item.sym}')" class="ml-1.5 text-[10px] opacity-65 hover:opacity-100 hover:text-rose-500 cursor-pointer" title="${item.sym} 제거">×</span>`
+                    : "";
+                return `<button onclick="changeSymbol('${item.sym}')" class="px-2 py-0.5 rounded-sm flex items-center transition-colors ${btnCls}">
+                    <span>${item.sym}</span>${delBtn}
+                </button>`;
+            }).join('');
+
+            const wlInput = document.getElementById('inp-watchlist');
+            if (wlInput) wlInput.value = quickWatchlist.map(x => x.sym).join(', ');
+        }
+
+        function upsertWatchlistSymbol(sym, customQ = null) {
+            const existing = quickWatchlist.find(x => x.sym === sym);
+            if (existing) {
+                if (customQ !== null && !isNaN(customQ)) existing.q = customQ;
+            } else {
+                const fallbackQ = (customQ !== null && !isNaN(customQ)) ? customQ : (DEFAULT_DIV_MAP[sym] ?? 0.0);
+                quickWatchlist.push({ sym, q: fallbackQ });
+                if (quickWatchlist.length > 10) quickWatchlist.shift();
+            }
+            saveWatchlist();
+            renderQuickSymbolBar();
+        }
+
+        function removeQuickSymbol(ev, sym) {
+            ev.stopPropagation();
+            if (quickWatchlist.length <= 1) return;
+            quickWatchlist = quickWatchlist.filter(x => x.sym !== sym);
+            saveWatchlist();
+            if (currentSymbol === sym) {
+                changeSymbol(quickWatchlist[0].sym);
+            } else {
+                renderQuickSymbolBar();
+            }
+        }
+
+        function syncWatchlistFromInput() {
+            const raw = document.getElementById('inp-watchlist').value;
+            const tokens = raw.split(',').map(s => {
+                let c = s.trim().toUpperCase().replace(/^_/, '');
+                return TICKER_TYPO_MAP[c] || c;
+            }).filter(Boolean);
+
+            const unique = [...new Set(tokens)].slice(0, 10);
+            if (unique.length === 0) return;
+
+            quickWatchlist = unique.map(sym => {
+                const prev = quickWatchlist.find(x => x.sym === sym);
+                return { sym, q: prev ? prev.q : (DEFAULT_DIV_MAP[sym] ?? 0.0) };
+            });
+            saveWatchlist();
+            renderQuickSymbolBar();
+            if (!unique.includes(currentSymbol)) {
+                changeSymbol(unique[0]);
+            }
+        }
+
+        // ================= 포맷터 유틸리티 =================
+        const fmtPrice = (val) => {
+            if (val === null || val === undefined || isNaN(val)) return "--";
+            return "$" + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        const fmtStrike = (val) => {
+            if (!val && val !== 0) return "--";
+            const isInt = Math.abs(val - Math.round(val)) < 1e-4;
+            return "$" + val.toLocaleString('en-US', { minimumFractionDigits: isInt ? 0 : 2, maximumFractionDigits: 2 });
+        };
+
         const fmtLarge = (val) => {
-            if (!val || val === 0) return "0";
+            if (!val || isNaN(val) || Math.abs(val) < 1e-6) return "0";
             let sign = val > 0 ? "+" : "";
             let abs = Math.abs(val);
             if (abs >= 1e9) return sign + (val / 1e9).toFixed(2) + "B";
             if (abs >= 1e6) return sign + (val / 1e6).toFixed(2) + "M";
             if (abs >= 1e3) return sign + (val / 1e3).toFixed(1) + "K";
-            return sign + val.toFixed(2);
+            return sign + val.toFixed(1);
         };
 
-        // 명목 달러($) 포맷터 (+-$12.34M)
         const fmtLargeUSD = (val) => {
-            if (!val || val === 0) return "$0";
+            if (!val || isNaN(val) || Math.abs(val) < 1e-6) return "$0";
             let sign = val > 0 ? "+$" : "-$";
             let abs = Math.abs(val);
             if (abs >= 1e9) return sign + (abs / 1e9).toFixed(2) + "B";
             if (abs >= 1e6) return sign + (abs / 1e6).toFixed(2) + "M";
             if (abs >= 1e3) return sign + (abs / 1e3).toFixed(1) + "K";
-            return sign + abs.toFixed(2);
+            return sign + abs.toFixed(0);
         };
 
-        const fmtNum = (val) => val >= 1e6 ? (val/1e6).toFixed(2)+"M" : val >= 1e3 ? (val/1e3).toFixed(1)+"K" : val.toFixed(0);
+        const fmtNum = (val) => {
+            if (!val || val <= 0) return "0";
+            if (val >= 1e6) return (val / 1e6).toFixed(2) + "M";
+            if (val >= 1e3) return (val / 1e3).toFixed(1) + "K";
+            return Math.round(val).toLocaleString('en-US');
+        };
 
+        // ================= 미국 동부시간(ET) 세션 시계 & 영업일 헬퍼 =================
+        function toDateKey(yyyy, mm, dd) {
+            return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+        }
+
+        function isUSTradingDayUTC(utcMs) {
+            const dt = new Date(utcMs);
+            const dow = dt.getUTCDay();
+            if (dow === 0 || dow === 6) return false;
+            const key = toDateKey(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+            return !US_MARKET_HOLIDAYS.has(key);
+        }
+
+        function getNYParts(dateObj) {
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/New_York',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            }).formatToParts(dateObj);
+            const map = {};
+            parts.forEach(p => { map[p.type] = p.value; });
+            const wdMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+            let hr = parseInt(map.hour, 10);
+            if (hr === 24) hr = 0;
+            return {
+                yyyy: parseInt(map.year, 10),
+                mm: parseInt(map.month, 10),
+                dd: parseInt(map.day, 10),
+                dow: wdMap[map.weekday] ?? 0,
+                hour: hr,
+                minute: parseInt(map.minute, 10),
+                second: parseInt(map.second, 10)
+            };
+        }
+
+        function getNYTimeUTC(yyyy, mm, dd, hourET = 16, minET = 0) {
+            const probe = new Date(Date.UTC(yyyy, mm - 1, dd, 18, 0, 0));
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/New_York',
+                timeZoneName: 'shortOffset'
+            }).formatToParts(probe);
+            const tzPart = parts.find(p => p.type === 'timeZoneName');
+            let offsetHours = -5;
+            if (tzPart && tzPart.value) {
+                const m = tzPart.value.match(/GMT([+-]\d+)/);
+                if (m) offsetHours = parseInt(m[1], 10);
+            }
+            return new Date(Date.UTC(yyyy, mm - 1, dd, hourET - offsetHours, minET, 0));
+        }
+
+        function getNYCloseUTC(yyyy, mm, dd) {
+            return getNYTimeUTC(yyyy, mm, dd, 16, 0);
+        }
+
+        function getSessionClockState() {
+            const now = new Date();
+            const ny = getNYParts(now);
+            const mins = ny.hour * 60 + ny.minute;
+            const todayNoonUTC = Date.UTC(ny.yyyy, ny.mm - 1, ny.dd, 12, 0, 0);
+            const isTodayTrading = isUSTradingDayUTC(todayNoonUTC);
+            const isRegularOpen = isTodayTrading && mins >= (9 * 60 + 30) && mins <= (16 * 60 + 15);
+
+            let anchorMs = todayNoonUTC;
+            if (!isTodayTrading || mins > (16 * 60 + 15)) {
+                anchorMs += 86400000;
+                while (!isUSTradingDayUTC(anchorMs)) {
+                    anchorMs += 86400000;
+                }
+            }
+
+            if (clockMode === 'realtime') {
+                return {
+                    evalTimeMs: now.getTime(),
+                    isRegularOpen,
+                    nyNow: ny,
+                    anchorSessionNoonMs: anchorMs,
+                    badgeText: "실시간 시계",
+                    badgeStyle: "bg-zinc-900 text-zinc-300 border-zinc-700"
+                };
+            }
+
+            if (isRegularOpen) {
+                const delayedMs = now.getTime() - 15 * 60 * 1000;
+                const openTodayMs = getNYTimeUTC(ny.yyyy, ny.mm, ny.dd, 9, 30).getTime();
+                return {
+                    evalTimeMs: Math.max(openTodayMs, delayedMs),
+                    isRegularOpen: true,
+                    nyNow: ny,
+                    anchorSessionNoonMs: anchorMs,
+                    badgeText: "정규장 (15m 동기화)",
+                    badgeStyle: "bg-emerald-950/40 text-emerald-400 border-emerald-800/60"
+                };
+            }
+
+            let prevSessionMs = todayNoonUTC;
+            if (!isTodayTrading || mins < (9 * 60 + 30)) {
+                prevSessionMs -= 86400000;
+                while (!isUSTradingDayUTC(prevSessionMs)) {
+                    prevSessionMs -= 86400000;
+                }
+            }
+            const prevDt = new Date(prevSessionMs);
+            const cy = prevDt.getUTCFullYear();
+            const cm = prevDt.getUTCMonth() + 1;
+            const cd = prevDt.getUTCDate();
+            const closeDt = getNYTimeUTC(cy, cm, cd, 16, 0);
+
+            return {
+                evalTimeMs: closeDt.getTime(),
+                isRegularOpen: false,
+                nyNow: ny,
+                anchorSessionNoonMs: anchorMs,
+                badgeText: `휴장 고정 (${cm}/${cd} 마감)`,
+                badgeStyle: "bg-zinc-900 text-pivot border-zinc-800"
+            };
+        }
+
+        function calcSessionDTE(anchorNoonMs, expY, expM, expD) {
+            const expNoonMs = Date.UTC(expY, expM - 1, expD, 12, 0, 0);
+            if (expNoonMs <= anchorNoonMs) return 0;
+            let dte = 0;
+            let cur = anchorNoonMs + 86400000;
+            while (cur <= expNoonMs) {
+                if (isUSTradingDayUTC(cur)) dte++;
+                cur += 86400000;
+            }
+            return dte;
+        }
+
+        // ================= 블랙-숄즈-머튼 연산기 =================
         function norm_pdf(x) { return Math.exp(-0.5 * x * x) / Math.sqrt(2.0 * Math.PI); }
         function norm_cdf(x) {
-            let sign = 1; if (x < 0) { sign = -1; x = -x; }
+            let sign = 1;
+            if (x < 0) { sign = -1; x = -x; }
             let t = 1.0 / (1.0 + 0.3275911 * x);
             let y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * norm_pdf(x);
             return sign === 1 ? y : 1.0 - y;
         }
 
-        function calculate_greeks(S, K, T, iv, is_call) {
-            if (T <= 0 || iv <= 0 || S <= 0) return { delta: 0, gamma: 0 };
-            let d1 = (Math.log(S / K) + (0.5 * iv * iv) * T) / (iv * Math.sqrt(T));
-            let gamma = norm_pdf(d1) / (S * iv * Math.sqrt(T));
-            let delta = is_call ? norm_cdf(d1) : norm_cdf(d1) - 1.0;
+        function getDealerMultiplier(isCall) {
+            if (dealerMode === 'momentum') return -1.0;
+            return isCall ? 1.0 : -1.0;
+        }
+
+        function calc_bsm_fast(S, K, T, r, q, iv, isCall) {
+            if (S <= 0 || K <= 0 || T <= 0) return { delta: 0, gamma: 0 };
+            let discQ = Math.exp(-q * T);
+            if (iv <= 0.001) {
+                let intrinsicDelta = isCall ? (S > K ? discQ : 0) : (S < K ? -discQ : 0);
+                return { delta: intrinsicDelta, gamma: 0 };
+            }
+            let sqrtT = Math.sqrt(T);
+            let d1 = (Math.log(S / K) + (r - q + 0.5 * iv * iv) * T) / (iv * sqrtT);
+            let gamma = (discQ * norm_pdf(d1)) / (S * iv * sqrtT);
+            let delta = isCall ? discQ * norm_cdf(d1) : discQ * (norm_cdf(d1) - 1.0);
             return { delta, gamma };
         }
 
-        function calc_advanced_greeks(S, K, T, iv, is_call) {
-            if (T <= 0 || iv <= 0 || S <= 0) return { delta: 0, gamma: 0, theta: 0, vega: 0, vanna: 0, charm: 0 };
-            let d1 = (Math.log(S / K) + (0.5 * iv * iv) * T) / (iv * Math.sqrt(T));
-            let d2 = d1 - iv * Math.sqrt(T);
-            let pdf_d1 = norm_pdf(d1);
-            let gamma = pdf_d1 / (S * iv * Math.sqrt(T));
-            let delta = is_call ? norm_cdf(d1) : norm_cdf(d1) - 1.0;
-            let vega = S * pdf_d1 * Math.sqrt(T) / 100.0; 
-            let theta = (- (S * pdf_d1 * iv) / (2 * Math.sqrt(T))) / 365.0;
-            let vanna = - pdf_d1 * d2 / iv / 100.0; 
-            let charm = (pdf_d1 * d2 / (2 * T)) / 365.0; 
+        function calc_bsm_advanced(S, K, T, r, q, iv, isCall) {
+            if (S <= 0 || K <= 0 || T <= 0) {
+                return { delta: 0, gamma: 0, theta: 0, vega: 0, vanna: 0, charm: 0 };
+            }
+            let discQ = Math.exp(-q * T);
+            if (iv <= 0.001) {
+                let intrinsicDelta = isCall ? (S > K ? discQ : 0) : (S < K ? -discQ : 0);
+                return { delta: intrinsicDelta, gamma: 0, theta: 0, vega: 0, vanna: 0, charm: 0 };
+            }
+            let discR = Math.exp(-r * T);
+            let sqrtT = Math.sqrt(T);
+            let d1 = (Math.log(S / K) + (r - q + 0.5 * iv * iv) * T) / (iv * sqrtT);
+            let d2 = d1 - iv * sqrtT;
+            let pdf1 = norm_pdf(d1);
+            let cdf1 = norm_cdf(d1);
+            let cdf2 = norm_cdf(d2);
+
+            let gamma = (discQ * pdf1) / (S * iv * sqrtT);
+            let delta = isCall ? discQ * cdf1 : discQ * (cdf1 - 1.0);
+            let vega = (S * discQ * pdf1 * sqrtT) / 100.0;
+
+            let thetaAnnual = isCall
+                ? (-(S * discQ * pdf1 * iv) / (2 * sqrtT) - r * K * discR * cdf2 + q * S * discQ * cdf1)
+                : (-(S * discQ * pdf1 * iv) / (2 * sqrtT) + r * K * discR * norm_cdf(-d2) - q * S * discQ * norm_cdf(-d1));
+            let theta = thetaAnnual / 365.0;
+
+            let vanna = (-discQ * pdf1 * d2 / iv) / 100.0;
+
+            let charmCore = discQ * pdf1 * ((2 * (r - q) * T - d2 * iv * sqrtT) / (2 * T * iv * sqrtT));
+            let charmAnnual = isCall
+                ? (-q * discQ * cdf1 + charmCore)
+                : (q * discQ * norm_cdf(-d1) + charmCore);
+            let charm = -charmAnnual / 365.0;
+
             return { delta, gamma, theta, vega, vanna, charm };
         }
 
-        function updateExpiries() {
-            let now = new Date();
-            let target0 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 8, 0, 0));
-            if (now.getTime() >= target0.getTime()) {
-                target0.setUTCDate(target0.getUTCDate() + 1);
-            }
-            let target1 = new Date(target0);
-            target1.setUTCDate(target1.getUTCDate() + 1);
-            
-            let year = target0.getUTCFullYear();
-            let month = target0.getUTCMonth();
-            
-            function getLastFriday(y, m) {
-                let d = new Date(Date.UTC(y, m + 1, 0, 8, 0, 0));
-                let dayOfWeek = d.getUTCDay(); 
-                let daysToSubtract = (dayOfWeek >= 5) ? dayOfWeek - 5 : dayOfWeek + 2;
-                d.setUTCDate(d.getUTCDate() - daysToSubtract);
-                return d;
-            }
-            
-            let targetMonthly = getLastFriday(year, month);
-            if (target0.getTime() > targetMonthly.getTime()) { 
-                month++;
-                if (month > 11) { month = 0; year++; }
-                targetMonthly = getLastFriday(year, month);
+        // ================= 누락 IV 선형 보간기 =================
+        function interpolateMissingIVs(optionsList, fallbackIvDec) {
+            const groups = {};
+            for (let i = 0; i < optionsList.length; i++) {
+                const o = optionsList[i];
+                const key = `${o.expStr}_${o.isCall ? 'C' : 'P'}`;
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(o);
             }
 
-            let nextMonth = month + 1;
-            let nextYear = year;
-            if (nextMonth > 11) { nextMonth = 0; nextYear++; }
-            let targetNextMonthly = getLastFriday(nextYear, nextMonth);
-            
-            const formatExpiry = (dt) => {
-                const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-                return `${dt.getUTCDate()}${months[dt.getUTCMonth()]}${dt.getUTCFullYear().toString().slice(-2)}`;
+            const defaultIv = fallbackIvDec > 0.01 ? fallbackIvDec : 0.22;
+
+            Object.values(groups).forEach(arr => {
+                arr.sort((a, b) => a.strike - b.strike);
+                const validIdx = [];
+                for (let i = 0; i < arr.length; i++) {
+                    if (arr[i].iv > 0.005) validIdx.push(i);
+                }
+                if (validIdx.length === 0) {
+                    arr.forEach(o => { if (o.oi > 0 || o.vol > 0) o.iv = defaultIv; });
+                    return;
+                }
+
+                let ptr = 0;
+                for (let i = 0; i < arr.length; i++) {
+                    if (arr[i].iv > 0.005) continue;
+                    if (arr[i].oi <= 0 && arr[i].vol <= 0) continue;
+
+                    while (ptr < validIdx.length && validIdx[ptr] < i) ptr++;
+
+                    if (ptr === 0) {
+                        arr[i].iv = arr[validIdx[0]].iv;
+                    } else if (ptr >= validIdx.length) {
+                        arr[i].iv = arr[validIdx[validIdx.length - 1]].iv;
+                    } else {
+                        const left = arr[validIdx[ptr - 1]];
+                        const right = arr[validIdx[ptr]];
+                        const span = right.strike - left.strike;
+                        const w = span > 0 ? (arr[i].strike - left.strike) / span : 0.5;
+                        arr[i].iv = left.iv + w * (right.iv - left.iv);
+                    }
+                    arr[i].ivInterpolated = true;
+                }
+            });
+        }
+
+        // ================= OCC 심볼 파서 & 4-Tier 만기 분류기 =================
+        function parseOccSymbol(occStr) {
+            if (!occStr) return null;
+            let clean = occStr.trim().replace(/\s+/g, '');
+            let m = clean.match(/^([A-Z0-9._]+?)(\d{2})(\d{2})(\d{2})([CP])(\d{8})$/);
+            if (!m) return null;
+            let yyyy = 2000 + parseInt(m[2], 10);
+            let mm = parseInt(m[3], 10);
+            let dd = parseInt(m[4], 10);
+            let expStr = toDateKey(yyyy, mm, dd);
+            let isCall = (m[5] === 'C');
+            let strike = parseInt(m[6], 10) / 1000.0;
+            return { expStr, yyyy, mm, dd, isCall, strike };
+        }
+
+        function getThirdFridayDay(yyyy, mm) {
+            let firstDay = new Date(Date.UTC(yyyy, mm - 1, 1)).getUTCDay();
+            let firstFriday = 1 + ((5 - firstDay + 7) % 7);
+            return firstFriday + 14;
+        }
+
+        function isStandardMonthlyOpEx(yyyy, mm, dd) {
+            const thirdFri = getThirdFridayDay(yyyy, mm);
+            const friKey = toDateKey(yyyy, mm, thirdFri);
+            if (US_MARKET_HOLIDAYS.has(friKey)) {
+                return dd === (thirdFri - 1);
+            }
+            return dd === thirdFri;
+        }
+
+        function detectListingCadence(activeExps, anchorNoonMs) {
+            const near = activeExps.filter(e => {
+                const diffDays = (Date.UTC(e.yyyy, e.mm - 1, e.dd, 12, 0, 0) - anchorNoonMs) / 86400000;
+                return diffDays >= 0 && diffDays <= 21;
+            });
+            let hasTueThu = false;
+            let hasMonWed = false;
+
+            near.forEach(e => {
+                const dow = new Date(Date.UTC(e.yyyy, e.mm - 1, e.dd, 12, 0, 0)).getUTCDay();
+                const nextFriKey = toDateKey(e.yyyy, e.mm, e.dd + 1);
+                const isHolidayShiftedThu = (dow === 4 && US_MARKET_HOLIDAYS.has(nextFriKey));
+
+                if (dow === 2 || (dow === 4 && !isHolidayShiftedThu)) hasTueThu = true;
+                if (dow === 1 || dow === 3) hasMonWed = true;
+            });
+
+            if (hasTueThu) return { type: 'daily', badge: '주 5일 데일리', style: 'bg-zinc-900 text-zinc-300 border-zinc-700' };
+            if (hasMonWed) return { type: 'triweekly', badge: '월·수·금 위클리', style: 'bg-zinc-900 text-zinc-300 border-zinc-700' };
+            return { type: 'weekly', badge: '금요일 위클리', style: 'bg-zinc-900 text-zinc-300 border-zinc-700' };
+        }
+
+        function selectFourTiers(expMap, clockState) {
+            const nowRealMs = Date.now();
+            const dayNames = ['일','월','화','수','목','금','토'];
+
+            let allExps = Object.values(expMap).sort((a, b) => a.dt.getTime() - b.dt.getTime());
+            let activeExps = allExps.filter(e => e.dt.getTime() > nowRealMs - 1800 * 1000);
+            if (activeExps.length === 0) activeExps = allExps;
+            if (activeExps.length === 0) return null;
+
+            const cadenceInfo = detectListingCadence(activeExps, clockState.anchorSessionNoonMs);
+
+            const decorate = (e) => {
+                const dowIdx = new Date(Date.UTC(e.yyyy, e.mm - 1, e.dd, 12, 0, 0)).getUTCDay();
+                const dowKor = dayNames[dowIdx];
+                const dte = calcSessionDTE(clockState.anchorSessionNoonMs, e.yyyy, e.mm, e.dd);
+                const isMonthly = isStandardMonthlyOpEx(e.yyyy, e.mm, e.dd);
+
+                let dteStr = "";
+                if (dte === 0) {
+                    dteStr = clockState.isRegularOpen ? "당일 0DTE" : "개장시 0DTE";
+                } else {
+                    dteStr = `${dte}DTE`;
+                }
+                return { ...e, dowKor, dte, isMonthly, desc: `${e.mm}/${e.dd}(${dowKor}) · ${dteStr}` };
+            };
+
+            const decoratedList = activeExps.map(decorate);
+            const frontMonthly = decoratedList.find(e => e.isMonthly) || null;
+
+            const exp0 = decoratedList[0];
+            const exp1 = decoratedList.length > 1 ? decoratedList[1] : decoratedList[0];
+            const usedSet = new Set([exp0.expStr, exp1.expStr]);
+
+            const remainingMonthlies = decoratedList.filter(e => e.isMonthly && !usedSet.has(e.expStr) && e.dt.getTime() > exp0.dt.getTime());
+
+            let expM = null;
+            if (remainingMonthlies.length > 0) {
+                expM = remainingMonthlies[0];
+            } else {
+                const fallbackAfter1 = decoratedList.filter(e => !usedSet.has(e.expStr) && e.dt.getTime() > exp1.dt.getTime());
+                expM = fallbackAfter1.length > 0 ? fallbackAfter1[0] : exp1;
+            }
+            usedSet.add(expM.expStr);
+
+            let expNM = null;
+            const monthliesAfterM = remainingMonthlies.filter(e => !usedSet.has(e.expStr) && e.dt.getTime() > expM.dt.getTime());
+            if (monthliesAfterM.length > 0) {
+                expNM = monthliesAfterM[0];
+            } else {
+                const fallbackAfterM = decoratedList.filter(e => !usedSet.has(e.expStr) && e.dt.getTime() > expM.dt.getTime());
+                expNM = fallbackAfterM.length > 0 ? fallbackAfterM[0] : expM;
+            }
+
+            const buildSlot0Label = (e) => {
+                const opexSuffix = e.isMonthly ? ` · ${e.mm}월 OpEx` : '';
+                if (e.dte === 0) return `최근접물 (0DTE${opexSuffix})`;
+                if (cadenceInfo.type === 'weekly') {
+                    return e.isMonthly ? `당주물 (${e.mm}월 OpEx · ${e.dte}DTE)` : `당주 위클리 (${e.dte}DTE)`;
+                }
+                return `최근접물 (${e.dowKor}·${e.dte}DTE${opexSuffix})`;
+            };
+
+            const buildSlot1Label = (e) => {
+                const opexSuffix = e.isMonthly ? ` · ${e.mm}월 OpEx` : '';
+                if (cadenceInfo.type === 'daily' && e.dte === 1) return `차근접물 (1DTE${opexSuffix})`;
+                if (cadenceInfo.type === 'weekly') {
+                    return e.isMonthly ? `차주물 (${e.mm}월 OpEx · ${e.dte}DTE)` : `차주 위클리 (${e.dte}DTE)`;
+                }
+                return `차근접물 (${e.dowKor}·${e.dte}DTE${opexSuffix})`;
+            };
+
+            const isFrontMonthlyAlreadyInShortSlots = frontMonthly && (frontMonthly.expStr === exp0.expStr || frontMonthly.expStr === exp1.expStr);
+
+            const buildSlotMLabel = (e) => {
+                if (!e.isMonthly) return `중기물 (${e.mm}/${e.dd} · ${e.dte}DTE)`;
+                return isFrontMonthlyAlreadyInShortSlots
+                    ? `차월물 (${e.mm}월 OpEx)`
+                    : `당월물 (${e.mm}월 OpEx)`;
+            };
+
+            const buildSlotNMLabel = (e) => {
+                if (!e.isMonthly) return `원월물 (${e.mm}/${e.dd} · ${e.dte}DTE)`;
+                return isFrontMonthlyAlreadyInShortSlots
+                    ? `차차월물 (${e.mm}월 OpEx)`
+                    : `차월물 (${e.mm}월 OpEx)`;
             };
 
             return {
-                exp0: { dt: target0, str: formatExpiry(target0), desc: "당일 KST 17:00" },
-                exp1: { dt: target1, str: formatExpiry(target1), desc: "내일 KST 17:00" },
-                expM: { dt: targetMonthly, str: formatExpiry(targetMonthly), desc: "당월 마지막 금요일" },
-                expNM: { dt: targetNextMonthly, str: formatExpiry(targetNextMonthly), desc: "차월 마지막 금요일" }
+                cadenceInfo,
+                exp0,
+                exp1,
+                expM,
+                expNM,
+                labels: {
+                    l0: buildSlot0Label(exp0),
+                    l1: buildSlot1Label(exp1),
+                    lM: buildSlotMLabel(expM),
+                    lNM: buildSlotNMLabel(expNM)
+                }
             };
         }
 
+        // ================= DOM 렌더링 초기화 및 잔상 클리어 =================
         const tiers = [
-            { id: "0dte", name: "0DTE (당일물)", badge: "🔴" },
-            { id: "1dte", name: "1DTE (차일물)", badge: "🔵" },
-            { id: "monthly", name: "당월물 (Monthly)", badge: "🟣" },
-            { id: "nextmonth", name: "차월물 (Next Month)", badge: "🟢" }
+            { id: "0dte", name: "최근접 단기물", code: "T1" },
+            { id: "1dte", name: "차근접 단기물", code: "T2" },
+            { id: "monthly", name: "당월물 (Monthly OpEx)", code: "T3" },
+            { id: "nextmonth", name: "차월물 (Next Monthly)", code: "T4" }
         ];
 
         function initDOM() {
             const container = document.getElementById('panels-container');
             container.innerHTML = tiers.map(t => `
-                <div id="pane-${t.id}" class="space-y-6 ${t.id === '0dte' ? '' : 'hidden'}">
-                    
-                    <!-- [상단] 통합 미시구조 지표 & 실시간 감마 레짐 요약 박스 -->
-                    <div class="card p-5 border-gray-800 bg-[#111827]/90">
-                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 mb-4 border-b border-gray-800 gap-3">
-                            <div class="flex items-center gap-2">
-                                <span class="text-lg">${t.badge}</span>
-                                <h2 class="text-base font-bold text-white">${t.name} 미시구조 지표군</h2>
-                                <span id="${t.id}-expiry-badge" class="text-xs text-gray-400 font-mono bg-gray-800/80 px-2 py-0.5 rounded border border-gray-700">만기 로드중...</span>
+                <div id="pane-${t.id}" class="space-y-4 ${t.id === '0dte' ? '' : 'hidden'}">
+                    <div class="panel p-4 md:p-5">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center pb-3.5 mb-4 border-b border-zinc-800/80 gap-2.5">
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <span class="text-[11px] font-num font-semibold px-1.5 py-0.5 rounded bg-zinc-800 text-pivot">${t.code}</span>
+                                <h2 class="text-sm md:text-base font-bold text-pivot tracking-tight" id="${t.id}-panel-title">${t.name} 미시구조 지표군</h2>
+                                <span id="${t.id}-expiry-badge" class="text-xs text-zinc-400 font-num bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">만기 로드중...</span>
                             </div>
-                            <div id="${t.id}-regime-banner" class="w-full md:w-auto px-3.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-3 bg-gray-800 border-gray-700 text-gray-300">
+                            <div id="${t.id}-regime-banner" class="w-full md:w-auto px-3 py-1 rounded border text-xs font-medium flex items-center justify-between gap-3 bg-zinc-900 border-zinc-800 text-zinc-400">
                                 <span>감마 레짐 연산 중...</span>
                             </div>
                         </div>
 
                         <!-- 7대 핵심 지표 그리드 -->
-                        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="옵션 매수자의 손실이 최대화되어 매도자/발행자의 이익이 극대화되는 행사가">
-                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
-                                    <span>🎯 MaxPain</span>
-                                    <span id="${t.id}-diff-maxpain" class="text-[10px] font-mono"></span>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                            <div class="metric-cell p-3">
+                                <div class="text-[11px] text-zinc-400 font-medium mb-1 flex items-center justify-between">
+                                    <span>Max Pain</span>
+                                    <span id="${t.id}-diff-maxpain" class="text-[10px] font-num"></span>
                                 </div>
-                                <div class="text-lg font-bold text-white font-mono" id="${t.id}-maxpain">--</div>
-                                <div class="text-[10px] text-gray-500 mt-0.5">매도자 이익 극대화선</div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-yellow-500/30 transition-colors" title="넷 감마가 0이 되는 분기점. 상회 시 변동성 억제(쿠션), 하향 돌파 시 감마 스퀴즈(추세 가속)">
-                                <div class="text-[11px] text-yellow-400 mb-1 flex items-center justify-between">
-                                    <span>🧲 Zero Γ (플립선)</span>
-                                    <span id="${t.id}-diff-zerogamma" class="text-[10px] font-mono"></span>
-                                </div>
-                                <div class="text-lg font-bold text-yellow-400 font-mono" id="${t.id}-zerogamma">--</div>
-                                <div class="text-[10px] text-gray-500 mt-0.5">횡보/가속 전환 분기점</div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="시장 넷 델타가 0이 되는 지점. 상/하방 델타 리스크가 중립화되는 단기 가격 균형선">
-                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
-                                    <span>📍 Zero Δ (수렴선)</span>
-                                    <span id="${t.id}-diff-zerodelta" class="text-[10px] font-mono"></span>
-                                </div>
-                                <div class="text-lg font-bold text-gray-200 font-mono" id="${t.id}-zerodelta">--</div>
-                                <div class="text-[10px] text-gray-500 mt-0.5">델타 균형 지점</div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="시장 넷 감마 노출량(Dollar GEX). 기초자산 1% 변동 시 헤지 달러 규모">
-                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
-                                    <span>⚡ Net Γ ($ GEX)</span>
-                                    <span id="${t.id}-diff-netgamma" class="text-[10px] font-mono"></span>
-                                </div>
-                                <div class="text-lg font-bold font-mono" id="${t.id}-netgamma">--</div>
-                                <div class="text-[10px] text-gray-500 mt-0.5" id="${t.id}-netgamma-sub">1% 변동당 헤지 노출</div>
-                            </div>
-                            
-                            <!-- 순 델타 카드 -->
-                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="시장 참여자 전체 미결제약정(OI)의 순 델타 합계(BTC). 양수(+)는 상방 롱 우세, 음수(-)는 하방 숏 우세">
-                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
-                                    <span>🧭 Net Δ (순 델타)</span>
-                                    <span id="${t.id}-diff-netdelta" class="text-[10px] font-mono"></span>
-                                </div>
-                                <div class="text-lg font-bold font-mono" id="${t.id}-netdelta">--</div>
-                                <div class="text-[10px] text-gray-500 mt-0.5" id="${t.id}-netdelta-sub">시장 델타 방향</div>
+                                <div class="text-lg font-bold text-zinc-100 font-num" id="${t.id}-maxpain">--</div>
+                                <div class="text-[10px] text-zinc-500 mt-0.5">매도자 이익 극대화선</div>
                             </div>
 
-                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="25델타 풋 IV - 콜 IV (활성 OI 필터 적용). 양수(+)면 하방 풋 헤지 수요 우세, 음수(-)면 상방 콜 공격 우세">
-                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
-                                    <span>🌪️ 25D Skew</span>
-                                    <span id="${t.id}-diff-skew" class="text-[10px] font-mono"></span>
+                            <div class="metric-cell p-3 border-amber-500/20">
+                                <div class="text-[11px] text-pivot font-medium mb-1 flex items-center justify-between">
+                                    <span>Zero Γ (플립선)</span>
+                                    <span id="${t.id}-diff-zerogamma" class="text-[10px] font-num"></span>
                                 </div>
-                                <div class="text-lg font-bold font-mono" id="${t.id}-skew">--</div>
-                                <div class="text-[10px] text-gray-500 mt-0.5">풋/콜 내재변동성 차</div>
+                                <div class="text-lg font-bold text-pivot font-num" id="${t.id}-zerogamma">--</div>
+                                <div class="text-[10px] text-zinc-500 mt-0.5">완충 / 추세가속 분기점</div>
                             </div>
-                            <div class="p-3 rounded-lg bg-gray-900/70 border border-gray-800 hover:border-gray-700 transition-colors" title="총 풋옵션 미결제약정 / 총 콜옵션 미결제약정. 1.0 초과 시 풋 미결제 우세">
-                                <div class="text-[11px] text-gray-400 mb-1 flex items-center justify-between">
-                                    <span>⚖️ PCR (OI)</span>
-                                    <span id="${t.id}-diff-pcr" class="text-[10px] font-mono"></span>
+
+                            <div class="metric-cell p-3">
+                                <div class="text-[11px] text-zinc-400 font-medium mb-1 flex items-center justify-between">
+                                    <span>Zero Δ (수렴선)</span>
+                                    <span id="${t.id}-diff-zerodelta" class="text-[10px] font-num"></span>
                                 </div>
-                                <div class="text-lg font-bold text-white font-mono" id="${t.id}-pcr">--</div>
-                                <div class="text-[10px] text-gray-500 mt-0.5">풋/콜 미결제약정 비율</div>
+                                <div class="text-lg font-bold text-zinc-200 font-num" id="${t.id}-zerodelta">--</div>
+                                <div class="text-[10px] text-zinc-500 mt-0.5">순 델타 중립 균형가</div>
+                            </div>
+
+                            <div class="metric-cell p-3">
+                                <div class="text-[11px] text-zinc-400 font-medium mb-1 flex items-center justify-between">
+                                    <span>Net Γ ($ GEX)</span>
+                                    <span id="${t.id}-diff-netgamma" class="text-[10px] font-num"></span>
+                                </div>
+                                <div class="text-lg font-bold font-num" id="${t.id}-netgamma">--</div>
+                                <div class="text-[10px] text-zinc-500 mt-0.5" id="${t.id}-netgamma-sub">1% 변동당 딜러 헤지</div>
+                            </div>
+
+                            <div class="metric-cell p-3">
+                                <div class="text-[11px] text-zinc-400 font-medium mb-1 flex items-center justify-between">
+                                    <span>Net Δ (순 델타)</span>
+                                    <span id="${t.id}-diff-netdelta" class="text-[10px] font-num"></span>
+                                </div>
+                                <div class="text-lg font-bold font-num" id="${t.id}-netdelta">--</div>
+                                <div class="text-[10px] text-zinc-500 mt-0.5" id="${t.id}-netdelta-sub">환산 주식수 노출</div>
+                            </div>
+
+                            <div class="metric-cell p-3">
+                                <div class="text-[11px] text-zinc-400 font-medium mb-1 flex items-center justify-between">
+                                    <span>25D Skew</span>
+                                    <span id="${t.id}-diff-skew" class="text-[10px] font-num"></span>
+                                </div>
+                                <div class="text-lg font-bold font-num" id="${t.id}-skew">--</div>
+                                <div class="text-[10px] text-zinc-500 mt-0.5">25Δ Put - Call IV</div>
+                            </div>
+
+                            <div class="metric-cell p-3">
+                                <div class="text-[11px] text-zinc-400 font-medium mb-1 flex items-center justify-between">
+                                    <span>PCR (OI)</span>
+                                    <span id="${t.id}-diff-pcr" class="text-[10px] font-num"></span>
+                                </div>
+                                <div class="text-lg font-bold text-zinc-100 font-num" id="${t.id}-pcr">--</div>
+                                <div class="text-[10px] text-zinc-500 mt-0.5 font-num" id="${t.id}-pcr-sub">풋/콜 미결제 비율</div>
                             </div>
                         </div>
 
-                        <!-- 2차 & 교차 그릭스 그리드 -->
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-800/80">
-                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="내재변동성 1% 변동 시 시장 포지션 명목 가치 변화량">
-                                <span class="text-xs text-gray-400">Net Vega (변동성 노출)</span>
+                        <!-- 2차 & 교차 그릭스 스트립 -->
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mt-2.5 pt-2.5 border-t border-zinc-800/70">
+                            <div class="flex justify-between items-center px-3 py-2 rounded bg-zinc-950/60 border border-zinc-800/60">
+                                <span class="text-xs text-zinc-400">Net Vega <span class="text-[10px] text-zinc-600">d$/dIV</span></span>
                                 <div class="text-right">
-                                    <span class="text-xs font-bold font-mono text-gray-300" id="${t.id}-netvega">--</span>
-                                    <span id="${t.id}-diff-netvega" class="text-[10px] font-mono ml-1"></span>
+                                    <span class="text-xs font-semibold font-num text-zinc-200" id="${t.id}-netvega">--</span>
+                                    <span id="${t.id}-diff-netvega" class="text-[10px] font-num ml-1"></span>
                                 </div>
                             </div>
-                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="하루 경과 시 시장 포지션 시간가치 감쇄량">
-                                <span class="text-xs text-gray-400">Net Theta (시간가치 감쇄)</span>
+                            <div class="flex justify-between items-center px-3 py-2 rounded bg-zinc-950/60 border border-zinc-800/60">
+                                <span class="text-xs text-zinc-400">Net Theta <span class="text-[10px] text-zinc-600">d$/dt</span></span>
                                 <div class="text-right">
-                                    <span class="text-xs font-bold font-mono text-gray-300" id="${t.id}-nettheta">--</span>
-                                    <span id="${t.id}-diff-nettheta" class="text-[10px] font-mono ml-1"></span>
+                                    <span class="text-xs font-semibold font-num text-zinc-200" id="${t.id}-nettheta">--</span>
+                                    <span id="${t.id}-diff-nettheta" class="text-[10px] font-num ml-1"></span>
                                 </div>
                             </div>
-                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="딜러 포지션 기준 IV 1% 변동 시 딜러 순 델타(BTC) 변화량 (dΔ/dIV). 양수(+) 시 IV 급락 때 숏 헤지 환매수(상승 압력) 유발">
-                                <span class="text-xs text-purple-400">Net Vanna (딜러 바나)</span>
+                            <div class="flex justify-between items-center px-3 py-2 rounded bg-zinc-950/60 border border-zinc-800/60">
+                                <span class="text-xs text-zinc-400">Net Vanna <span class="text-[10px] text-zinc-600">딜러 dΔ/dIV</span></span>
                                 <div class="text-right">
-                                    <span class="text-xs font-bold font-mono text-purple-300" id="${t.id}-netvanna">--</span>
-                                    <span id="${t.id}-diff-netvanna" class="text-[10px] font-mono ml-1"></span>
+                                    <span class="text-xs font-semibold font-num text-zinc-200" id="${t.id}-netvanna">--</span>
+                                    <span id="${t.id}-diff-netvanna" class="text-[10px] font-num ml-1"></span>
                                 </div>
                             </div>
-                            <div class="flex justify-between items-center px-3 py-1.5 rounded bg-gray-900/40 border border-gray-800/50" title="딜러 포지션 기준 1일 경과 시 딜러 순 델타(BTC) 변화량 (dΔ/dt). 만기 접근 시 시간가치 감쇄에 따른 딜러 헤지 리밸런싱 압력">
-                                <span class="text-xs text-emerald-400">Net Charm (딜러 참)</span>
+                            <div class="flex justify-between items-center px-3 py-2 rounded bg-zinc-950/60 border border-zinc-800/60">
+                                <span class="text-xs text-zinc-400">Net Charm <span class="text-[10px] text-zinc-600">딜러 dΔ/dt</span></span>
                                 <div class="text-right">
-                                    <span class="text-xs font-bold font-mono text-emerald-300" id="${t.id}-netcharm">--</span>
-                                    <span id="${t.id}-diff-netcharm" class="text-[10px] font-mono ml-1"></span>
+                                    <span class="text-xs font-semibold font-num text-zinc-200" id="${t.id}-netcharm">--</span>
+                                    <span id="${t.id}-diff-netcharm" class="text-[10px] font-num ml-1"></span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- [하단 2열] 좌: 미결제약정(OI) 밀집 방어벽 Top 10 / 우: 24h 거래량 Top 10 -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        
-                        <!-- 🛡️ 좌측: 누적 미결제약정 방어벽 Top 10 -->
-                        <div class="card p-4 border-gray-800">
-                            <div class="flex justify-between items-center pb-2.5 mb-3 border-b border-gray-800">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-base">🛡️</span>
-                                    <h3 class="text-sm font-bold text-white">미결제약정 밀집 방어벽 (OI Top 10)</h3>
-                                </div>
-                                <div class="text-[11px] text-gray-400">
-                                    정렬: <span class="text-gray-300 font-semibold">누적 미결제약정(OI) 상위 순</span>
+                    <!-- [하단 2열] 좌: 누적 OI 방어벽 Top 10 / 우: 당일 거래량 Top 10 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="panel p-4">
+                            <div class="flex flex-wrap justify-between items-center pb-2.5 mb-3 border-b border-zinc-800/80 gap-2">
+                                <h3 class="text-xs font-semibold text-pivot uppercase tracking-wider">Open Interest Walls (Top 10)</h3>
+                                <div id="${t.id}-oi-lag-notice" class="text-[11px] text-zinc-500">
+                                    OCC 정산 누적 미결제약정 순 (단위: 계약)
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <!-- Call Wall Top 10 -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div>
-                                    <div class="text-xs font-bold text-rose-400 flex justify-between items-center mb-2 px-1">
-                                        <span title="콜옵션 미결제약정이 밀집된 상단 저항선">🔴 C-Wall (저항 매물대)</span>
-                                        <span class="text-[10px] text-gray-500 font-normal">OI / 24h Vol</span>
+                                    <div class="text-xs font-semibold text-zinc-300 flex justify-between items-center mb-2 px-1">
+                                        <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>C-Wall (상단 저항)</span>
+                                        <span class="text-[10px] text-zinc-500 font-normal">OI / Vol</span>
                                     </div>
                                     <div class="overflow-x-auto">
                                         <table class="w-full text-left text-xs">
                                             <thead>
-                                                <tr class="text-[10px] text-gray-500 border-b border-gray-800">
-                                                    <th class="py-1.5 px-1 text-center w-8">순위</th>
-                                                    <th class="py-1.5 px-1">행사가</th>
-                                                    <th class="py-1.5 px-1 text-right" title="현재 누적 미결제약정">OI</th>
-                                                    <th class="py-1.5 px-1 text-right" title="최근 24시간 동안 체결된 거래량">24h Vol</th>
+                                                <tr class="text-[10px] text-zinc-500 border-b border-zinc-800 uppercase">
+                                                    <th class="py-1.5 px-1.5 w-7">#</th>
+                                                    <th class="py-1.5 px-1.5">Strike</th>
+                                                    <th class="py-1.5 px-1.5 text-right">OI</th>
+                                                    <th class="py-1.5 px-1.5 text-right">Vol</th>
                                                 </tr>
                                             </thead>
-                                            <tbody id="${t.id}-cwalls" class="divide-y divide-gray-800/40"></tbody>
+                                            <tbody id="${t.id}-cwalls" class="divide-y divide-zinc-800/40 font-num"></tbody>
                                         </table>
                                     </div>
                                 </div>
 
-                                <!-- Put Wall Top 10 -->
                                 <div>
-                                    <div class="text-xs font-bold text-emerald-400 flex justify-between items-center mb-2 px-1">
-                                        <span title="풋옵션 미결제약정이 밀집된 하단 지지선">🟢 P-Wall (지지 매물대)</span>
-                                        <span class="text-[10px] text-gray-500 font-normal">OI / 24h Vol</span>
+                                    <div class="text-xs font-semibold text-zinc-300 flex justify-between items-center mb-2 px-1">
+                                        <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>P-Wall (하단 지지)</span>
+                                        <span class="text-[10px] text-zinc-500 font-normal">OI / Vol</span>
                                     </div>
                                     <div class="overflow-x-auto">
                                         <table class="w-full text-left text-xs">
                                             <thead>
-                                                <tr class="text-[10px] text-gray-500 border-b border-gray-800">
-                                                    <th class="py-1.5 px-1 text-center w-8">순위</th>
-                                                    <th class="py-1.5 px-1">행사가</th>
-                                                    <th class="py-1.5 px-1 text-right" title="현재 누적 미결제약정">OI</th>
-                                                    <th class="py-1.5 px-1 text-right" title="최근 24시간 동안 체결된 거래량">24h Vol</th>
+                                                <tr class="text-[10px] text-zinc-500 border-b border-zinc-800 uppercase">
+                                                    <th class="py-1.5 px-1.5 w-7">#</th>
+                                                    <th class="py-1.5 px-1.5">Strike</th>
+                                                    <th class="py-1.5 px-1.5 text-right">OI</th>
+                                                    <th class="py-1.5 px-1.5 text-right">Vol</th>
                                                 </tr>
                                             </thead>
-                                            <tbody id="${t.id}-pwalls" class="divide-y divide-gray-800/40"></tbody>
+                                            <tbody id="${t.id}-pwalls" class="divide-y divide-zinc-800/40 font-num"></tbody>
                                         </table>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- 🔥 우측: 최근 24시간 실시간 거래량 밀집 Top 10 -->
-                        <div class="card p-4 border-gray-800">
-                            <div class="flex justify-between items-center pb-2.5 mb-3 border-b border-gray-800">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-base">🔥</span>
-                                    <h3 class="text-sm font-bold text-white">최근 24시간 거래량 집중 (Vol Top 10)</h3>
-                                </div>
-                                <div class="text-[11px] text-orange-400 font-semibold" title="신규 진입 및 청산이 격렬하게 일어난 단기 실시간 격전지">단기 실체결 격전지</div>
+                        <div class="panel p-4">
+                            <div class="flex justify-between items-center pb-2.5 mb-3 border-b border-zinc-800/80">
+                                <h3 class="text-xs font-semibold text-pivot uppercase tracking-wider">Intraday Active Volume (Top 10)</h3>
+                                <div class="text-[11px] text-zinc-500">정규장 실체결 및 회전율 상위</div>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <!-- Call Vol Top 10 -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div>
-                                    <div class="text-xs font-bold text-orange-400 flex justify-between items-center mb-2 px-1">
-                                        <span title="최근 24시간 콜옵션 매수/매도 체결량 집중 구간">🔥 Call 배팅 (상방 공격)</span>
-                                        <span class="text-[10px] text-gray-500 font-normal">24h Vol / OI / 회전</span>
+                                    <div class="text-xs font-semibold text-zinc-300 flex justify-between items-center mb-2 px-1">
+                                        <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>Call 체결 상위</span>
+                                        <span class="text-[10px] text-zinc-500 font-normal">Vol / OI / 회전율</span>
                                     </div>
                                     <div class="overflow-x-auto">
                                         <table class="w-full text-left text-xs">
                                             <thead>
-                                                <tr class="text-[10px] text-gray-500 border-b border-gray-800">
-                                                    <th class="py-1.5 px-1 text-center w-8">순위</th>
-                                                    <th class="py-1.5 px-1">행사가</th>
-                                                    <th class="py-1.5 px-1 text-right" title="24시간 누적 거래량">24h Vol</th>
-                                                    <th class="py-1.5 px-1 text-right" title="현재 누적 잔고">누적 OI</th>
-                                                    <th class="py-1.5 px-1 text-center" title="거래량 / 미결제약정 회전율">회전율</th>
+                                                <tr class="text-[10px] text-zinc-500 border-b border-zinc-800 uppercase">
+                                                    <th class="py-1.5 px-1.5 w-7">#</th>
+                                                    <th class="py-1.5 px-1.5">Strike</th>
+                                                    <th class="py-1.5 px-1.5 text-right">Vol</th>
+                                                    <th class="py-1.5 px-1.5 text-right">OI</th>
+                                                    <th class="py-1.5 px-1.5 text-right">Turn</th>
                                                 </tr>
                                             </thead>
-                                            <tbody id="${t.id}-cvol" class="divide-y divide-gray-800/40"></tbody>
+                                            <tbody id="${t.id}-cvol" class="divide-y divide-zinc-800/40 font-num"></tbody>
                                         </table>
                                     </div>
                                 </div>
 
-                                <!-- Put Vol Top 10 -->
                                 <div>
-                                    <div class="text-xs font-bold text-orange-400 flex justify-between items-center mb-2 px-1">
-                                        <span title="최근 24시간 풋옵션 매수/매도 체결량 집중 구간">🔥 Put 배팅 (하방 공격)</span>
-                                        <span class="text-[10px] text-gray-500 font-normal">24h Vol / OI / 회전</span>
+                                    <div class="text-xs font-semibold text-zinc-300 flex justify-between items-center mb-2 px-1">
+                                        <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Put 체결 상위</span>
+                                        <span class="text-[10px] text-zinc-500 font-normal">Vol / OI / 회전율</span>
                                     </div>
                                     <div class="overflow-x-auto">
                                         <table class="w-full text-left text-xs">
                                             <thead>
-                                                <tr class="text-[10px] text-gray-500 border-b border-gray-800">
-                                                    <th class="py-1.5 px-1 text-center w-8">순위</th>
-                                                    <th class="py-1.5 px-1">행사가</th>
-                                                    <th class="py-1.5 px-1 text-right" title="24시간 누적 거래량">24h Vol</th>
-                                                    <th class="py-1.5 px-1 text-right" title="현재 누적 잔고">누적 OI</th>
-                                                    <th class="py-1.5 px-1 text-center" title="거래량 / 미결제약정 회전율">회전율</th>
+                                                <tr class="text-[10px] text-zinc-500 border-b border-zinc-800 uppercase">
+                                                    <th class="py-1.5 px-1.5 w-7">#</th>
+                                                    <th class="py-1.5 px-1.5">Strike</th>
+                                                    <th class="py-1.5 px-1.5 text-right">Vol</th>
+                                                    <th class="py-1.5 px-1.5 text-right">OI</th>
+                                                    <th class="py-1.5 px-1.5 text-right">Turn</th>
                                                 </tr>
                                             </thead>
-                                            <tbody id="${t.id}-pvol" class="divide-y divide-gray-800/40"></tbody>
+                                            <tbody id="${t.id}-pvol" class="divide-y divide-zinc-800/40 font-num"></tbody>
                                         </table>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
                     </div>
-
                 </div>
             `).join('');
         }
 
-        let currentTab = '0dte';
+        function clearBoardOnSymbolSwitch(sym) {
+            document.getElementById('spot-label').innerText = `${sym} SPOT`;
+            document.getElementById('val-spot').innerText = "--";
+            document.getElementById('val-iv').innerText = "--";
+            document.getElementById('snap-diff-spot').innerText = "";
+            document.getElementById('snap-diff-iv').innerText = "";
+
+            const cadEl = document.getElementById('cadence-badge');
+            if (cadEl) {
+                cadEl.innerText = "만기주기 확인중";
+                cadEl.className = "px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-800";
+            }
+
+            tiers.forEach((t, idx) => {
+                const sumRow = document.getElementById(`sum-row-${t.id}`);
+                if (sumRow) {
+                    sumRow.innerHTML = idx === 0
+                        ? `<td colspan="8" class="py-2 px-2 text-zinc-500 font-sans">${sym} 옵션 체인 수신 중...</td>`
+                        : "";
+                }
+                document.getElementById(`tab-sub-${t.id}`).innerText = "탐색중...";
+                document.getElementById(`${t.id}-expiry-badge`).innerText = "만기 로드중...";
+
+                const regBanner = document.getElementById(`${t.id}-regime-banner`);
+                if (regBanner) {
+                    regBanner.className = "w-full md:w-auto px-3 py-1 rounded border text-xs font-medium flex items-center justify-between gap-3 bg-zinc-900 border-zinc-800 text-zinc-400";
+                    regBanner.innerHTML = "<span>감마 레짐 연산 중...</span>";
+                }
+
+                const lagEl = document.getElementById(`${t.id}-oi-lag-notice`);
+                if (lagEl) {
+                    lagEl.innerHTML = "OCC 정산 누적 미결제약정 순 (단위: 계약)";
+                }
+
+                ['maxpain','zerogamma','zerodelta','netgamma','netdelta','skew','pcr','netvega','nettheta','netvanna','netcharm'].forEach(k => {
+                    const el = document.getElementById(`${t.id}-${k}`);
+                    if (el) el.innerText = "--";
+                });
+                clearTierDiffBadges(t.id);
+                ['cwalls','pwalls','cvol','pvol'].forEach(tb => {
+                    const tbody = document.getElementById(`${t.id}-${tb}`);
+                    if (tbody) tbody.innerHTML = "";
+                });
+            });
+        }
+
         function switchTab(targetId) {
-            currentTab = targetId;
+            currentActiveTab = targetId;
             tiers.forEach(t => {
                 const pane = document.getElementById(`pane-${t.id}`);
                 const btn = document.getElementById(`btn-tab-${t.id}`);
+                const sumRow = document.getElementById(`sum-row-${t.id}`);
                 if (t.id === targetId) {
                     pane.classList.remove('hidden');
-                    btn.classList.add(`tab-active-${t.id}`);
-                    btn.classList.remove('opacity-70');
+                    btn.classList.add('tier-tab-active');
+                    btn.classList.remove('opacity-75');
+                    if (sumRow) sumRow.classList.add('bg-zinc-800/35');
                 } else {
                     pane.classList.add('hidden');
-                    btn.classList.remove(`tab-active-${t.id}`);
-                    btn.classList.add('opacity-70');
+                    btn.classList.remove('tier-tab-active');
+                    btn.classList.add('opacity-75');
+                    if (sumRow) sumRow.classList.remove('bg-zinc-800/35');
                 }
             });
         }
 
-        initDOM();
+        function toggleConfigBar() {
+            document.getElementById('config-bar').classList.toggle('hidden');
+        }
 
-        // [스냅샷 관리 함수]
+        // ================= 스냅샷 관리 =================
+        function getSnapshotKey() { return `us_4tier_quant_snap_${currentSymbol}_v1`; }
+
         function getSavedSnapshot() {
             try {
-                const raw = localStorage.getItem(SNAPSHOT_KEY);
+                const raw = localStorage.getItem(getSnapshotKey());
                 return raw ? JSON.parse(raw) : null;
             } catch (e) { return null; }
         }
@@ -658,22 +1269,22 @@
             if (Object.keys(latestMetrics).length === 0) return;
             const snap = {
                 timeStr: new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-                btcPrice: btcPrice,
-                dvol: currentDvol,
+                spotPrice: getEffectiveSpot(),
+                iv30: currentAtmIv30,
                 tiers: JSON.parse(JSON.stringify(latestMetrics))
             };
             try {
-                localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
+                localStorage.setItem(getSnapshotKey(), JSON.stringify(snap));
                 updateSnapshotUI();
-                fetchQuantData();
+                if (rawCboeChain) processFullChain(rawCboeChain);
             } catch (e) {}
         }
 
         function clearSnapshot() {
             try {
-                localStorage.removeItem(SNAPSHOT_KEY);
+                localStorage.removeItem(getSnapshotKey());
                 updateSnapshotUI();
-                fetchQuantData();
+                if (rawCboeChain) processFullChain(rawCboeChain);
             } catch (e) {}
         }
 
@@ -691,396 +1302,575 @@
             const banner = document.getElementById('snap-status-banner');
 
             if (snap) {
-                btnText.innerText = `${snap.timeStr} 기준 갱신`;
+                btnText.innerText = `${snap.timeStr} 갱신`;
                 btnClear.classList.remove('hidden');
-                banner.innerHTML = `<span class="text-indigo-400 font-semibold">📌 [${snap.timeStr}] 스냅샷 고정됨 (Spot $${Math.round(snap.btcPrice).toLocaleString()})</span> · 만기 종목코드 기준 실시간 증감량(Δ) 추적 중`;
+                banner.innerHTML = `<span class="text-zinc-200 font-medium">[${currentSymbol} ${snap.timeStr} 기준 고정 · ${fmtPrice(snap.spotPrice)}]</span> <span class="text-zinc-500">만기별 실시간 증감량(Δ) 추적 중</span>`;
             } else {
                 btnText.innerText = "스냅샷 고정";
                 btnClear.classList.add('hidden');
-                banner.innerText = "📌 상단 [스냅샷 고정] 클릭 시 시점 대비 실시간 증감량(Δ)이 표시됩니다.";
-                document.getElementById('snap-diff-btc').innerText = "";
-                document.getElementById('snap-diff-dvol').innerText = "";
+                banner.innerText = "스냅샷 미설정 · OI: OCC 개장 전 정산 / 거래량·IV: 15분 지연";
+                document.getElementById('snap-diff-spot').innerText = "";
+                document.getElementById('snap-diff-iv').innerText = "";
                 tiers.forEach(t => clearTierDiffBadges(t.id));
             }
-        }
-
-        updateSnapshotUI();
-
-        // [무기한 선물 가격 & 실시간 베이시스 렌더링 함수]
-        function updatePerpAndBasis(newPerpPrice, sourceName, funding8h = null) {
-            if (!newPerpPrice || newPerpPrice <= 0) return;
-            perpPrice = newPerpPrice;
-
-            const perpEl = document.getElementById('val-perp');
-            const labelEl = document.getElementById('perp-source-label');
-            const fundEl = document.getElementById('val-funding');
-
-            if (perpEl) {
-                perpEl.innerText = "$" + perpPrice.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-            }
-            if (labelEl && sourceName) {
-                labelEl.innerText = sourceName;
-            }
-            if (fundEl && funding8h !== null && funding8h !== undefined) {
-                const fPct = (funding8h * 100).toFixed(4);
-                fundEl.innerText = `F: ${funding8h >= 0 ? '+' : ''}${fPct}%`;
-                fundEl.className = `text-[10px] font-mono ${funding8h > 0.0001 ? 'text-amber-400' : funding8h < 0 ? 'text-cyan-400' : 'text-gray-400'}`;
-            }
-
-            if (btcPrice > 0 && perpPrice > 0) {
-                const basis = perpPrice - btcPrice;
-                const basisEl = document.getElementById('val-basis');
-                if (basisEl) {
-                    const sign = basis >= 0 ? "+" : "-";
-                    basisEl.innerText = `Basis ${sign}$${Math.abs(basis).toFixed(1)}`;
-                    basisEl.className = `text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${basis > 50 ? 'bg-rose-950/80 text-rose-400 border border-rose-500/40' : basis < -20 ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40' : 'bg-gray-800 text-gray-300'}`;
-                }
-            }
-        }
-
-        // [바이낸스 선물 REST 폴링 시도 (성공 시 BINANCE PERP 우선 표기, 차단 시 데리비트 WS가 자동 대체)]
-        async function pollBinancePerpREST() {
-            try {
-                const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT", { cache: "no-store" });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.price) {
-                        binanceActive = true;
-                        updatePerpAndBasis(parseFloat(data.price), "BINANCE PERP");
-                    }
-                }
-            } catch (e) {
-                // 로컬 file:// 환경 등에서 바이낸스 도메인 차단 시 데리비트 웹소켓(id: 4)이 자동 처리
-                binanceActive = false;
-            }
-        }
-
-        // [데리비트 웹소켓 연결 (옵션 데이터 + BTC-PERPETUAL 실시간 선물 데이터 일체형 수신)]
-        const wsUrl = "wss://www.deribit.com/ws/api/v2";
-        let ws = null;
-        let quantTimer = null;
-        let perpTimer = null;
-        let btcPrice = 0;
-        
-        function connectWS() {
-            ws = new WebSocket(wsUrl);
-            ws.onopen = function() {
-                const el = document.getElementById('ws-status');
-                el.className = "inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-700/50";
-                el.innerHTML = '<span class="text-emerald-400 mr-1.5">●</span> 웹소켓 연결됨';
-                
-                ws.send(JSON.stringify({ "jsonrpc": "2.0", "id": 1, "method": "public/subscribe", "params": { "channels": ["deribit_price_index.btc_usd"] } }));
-                ws.send(JSON.stringify({ "jsonrpc": "2.0", "id": 2, "method": "public/subscribe", "params": { "channels": ["deribit_volatility_index.btc_usd"] } }));
-                
-                fetchPerpTicker();
-                fetchQuantData();
-
-                if (quantTimer) clearInterval(quantTimer);
-                quantTimer = setInterval(fetchQuantData, 5000);
-
-                if (perpTimer) clearInterval(perpTimer);
-                perpTimer = setInterval(() => {
-                    fetchPerpTicker();
-                    pollBinancePerpREST();
-                }, 2000);
-            };
-
-            ws.onmessage = function(event) {
-                const msg = JSON.parse(event.data);
-                const snap = getSavedSnapshot();
-                
-                if (msg.method === 'subscription') {
-                    const channel = msg.params.channel;
-                    if (channel === 'deribit_price_index.btc_usd') {
-                        btcPrice = msg.params.data.price;
-                        document.getElementById('val-btc').innerText = fmtMoney(btcPrice);
-                        if (perpPrice > 0) updatePerpAndBasis(perpPrice, null);
-                        if (snap && snap.btcPrice) {
-                            const diffBtc = btcPrice - snap.btcPrice;
-                            const diffEl = document.getElementById('snap-diff-btc');
-                            diffEl.innerText = `(${diffBtc >= 0 ? '+' : ''}${Math.round(diffBtc)})`;
-                            diffEl.className = `text-[10px] font-mono ${diffBtc >= 0 ? 'text-up' : 'text-down'}`;
-                        }
-                        let btcCard = document.getElementById('btc-card');
-                        btcCard.classList.remove('flash-btc');
-                        void btcCard.offsetWidth;
-                        btcCard.classList.add('flash-btc');
-                    }
-                    if (channel === 'deribit_volatility_index.btc_usd') {
-                        currentDvol = msg.params.data.volatility;
-                        document.getElementById('val-dvol').innerText = currentDvol.toFixed(2) + "%";
-                        if (snap && snap.dvol) {
-                            const diffDvol = currentDvol - snap.dvol;
-                            const diffEl = document.getElementById('snap-diff-dvol');
-                            diffEl.innerText = `(${diffDvol >= 0 ? '+' : ''}${diffDvol.toFixed(2)}%)`;
-                            diffEl.className = `text-[10px] font-mono ${diffDvol >= 0 ? 'text-rose-400' : 'text-emerald-400'}`;
-                        }
-                        let dvolCard = document.getElementById('dvol-card');
-                        if (dvolCard) {
-                            dvolCard.classList.remove('flash-dvol');
-                            void dvolCard.offsetWidth;
-                            dvolCard.classList.add('flash-dvol');
-                        }
-                    }
-                }
-
-                // 기존 데리비트 웹소켓을 통한 BTC-PERPETUAL 실시간 선물/베이시스/펀딩비 수신
-                if (msg.id === 4 && msg.result) {
-                    const r = msg.result;
-                    const deribitPerp = r.last_price || r.mark_price || 0;
-                    const funding8h = r.funding_8h !== undefined ? r.funding_8h : r.current_funding;
-                    if (!binanceActive && deribitPerp > 0) {
-                        updatePerpAndBasis(deribitPerp, "BTC PERP", funding8h);
-                    } else if (binanceActive && funding8h !== undefined) {
-                        // 바이낸스 가격이 활성화된 상태에서도 펀딩비 보조 표기 업데이트
-                        updatePerpAndBasis(perpPrice, "BINANCE PERP", funding8h);
-                    }
-                }
-                
-                if (msg.id === 3 && msg.result) {
-                    let expiries = updateExpiries();
-
-                    document.getElementById('tab-sub-0dte').innerText = `${expiries.exp0.str} (${expiries.exp0.desc})`;
-                    document.getElementById('tab-sub-1dte').innerText = `${expiries.exp1.str} (${expiries.exp1.desc})`;
-                    document.getElementById('tab-sub-monthly').innerText = `${expiries.expM.str} (${expiries.expM.desc})`;
-                    document.getElementById('tab-sub-nextmonth').innerText = `${expiries.expNM.str} (${expiries.expNM.desc})`;
-
-                    document.getElementById('0dte-expiry-badge').innerText = `${expiries.exp0.str} · ${expiries.exp0.desc}`;
-                    document.getElementById('1dte-expiry-badge').innerText = `${expiries.exp1.str} · ${expiries.exp1.desc}`;
-                    document.getElementById('monthly-expiry-badge').innerText = `${expiries.expM.str} · ${expiries.expM.desc}`;
-                    document.getElementById('nextmonth-expiry-badge').innerText = `${expiries.expNM.str} · ${expiries.expNM.desc}`;
-
-                    // 만기 경과 종목이 메모리에 남지 않도록 최신 활성 만기 기준으로 갱신
-                    latestMetrics = {};
-
-                    runQuantEngine(msg.result, expiries.exp0, "0dte", "🔴 0DTE");
-                    runQuantEngine(msg.result, expiries.exp1, "1dte", "🔵 1DTE");
-                    runQuantEngine(msg.result, expiries.expM, "monthly", "🟣 당월물");
-                    runQuantEngine(msg.result, expiries.expNM, "nextmonth", "🟢 차월물");
-                    
-                    document.getElementById('val-update').innerText = new Date().toLocaleTimeString('ko-KR');
-                }
-            };
-
-            ws.onclose = function() {
-                if (quantTimer) { clearInterval(quantTimer); quantTimer = null; }
-                if (perpTimer) { clearInterval(perpTimer); perpTimer = null; }
-                const el = document.getElementById('ws-status');
-                el.className = "inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-red-950/60 text-red-400 border border-red-700/50";
-                el.innerHTML = '<span class="text-red-500 animate-pulse mr-1.5">●</span> 연결 끊김 (재연결 중)';
-                setTimeout(connectWS, 3000);
-            };
-        }
-
-        function fetchPerpTicker() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) return;
-            ws.send(JSON.stringify({ "jsonrpc": "2.0", "id": 4, "method": "public/ticker", "params": { "instrument_name": "BTC-PERPETUAL" } }));
-        }
-
-        function fetchQuantData() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) return;
-            ws.send(JSON.stringify({ "jsonrpc": "2.0", "id": 3, "method": "public/get_book_summary_by_currency", "params": { "currency": "BTC", "kind": "option" } }));
         }
 
         function renderDiffBadge(elId, diffVal, formatter, colorLogic = 'standard') {
             const el = document.getElementById(elId);
             if (!el) return;
-            if (Math.abs(diffVal) < 1e-4) {
+            if (isNaN(diffVal) || Math.abs(diffVal) < 1e-4) {
                 el.innerText = "-";
-                el.className = "text-[10px] font-mono text-gray-600";
+                el.className = "text-[10px] font-num text-zinc-600";
                 return;
             }
             el.innerText = "Δ " + formatter(diffVal);
             if (colorLogic === 'skew') {
-                el.className = `text-[10px] font-mono font-semibold ${diffVal > 0 ? 'text-down' : 'text-up'}`;
+                el.className = `text-[10px] font-num font-medium ${diffVal > 0 ? 'text-neg' : 'text-pos'}`;
             } else {
-                el.className = `text-[10px] font-mono font-semibold ${diffVal > 0 ? 'text-up' : 'text-down'}`;
+                el.className = `text-[10px] font-num font-medium ${diffVal > 0 ? 'text-pos' : 'text-neg'}`;
             }
         }
 
-        function runQuantEngine(data, expInfo, prefixId, tierLabel) {
-            let options = [];
-            let strikes = new Set();
-            let callOiMap = {}; let putOiMap = {};
-            let callVolMap = {}; let putVolMap = {}; 
-            let underlyingPrices = [];
+        // ================= Binance TradFi 무기한 선물 연동 =================
+        function getEffectiveSpot() {
+            if (priceRefMode === 'perp' && perpPrice > 0) return perpPrice;
+            return cboeSpotPrice > 0 ? cboeSpotPrice : perpPrice;
+        }
 
-            const searchKey = `-${expInfo.str}-`;
+        function updateBasisDisplay() {
+            const basisEl = document.getElementById('val-basis');
+            if (!basisEl) return;
+            if (cboeSpotPrice > 0 && perpPrice > 0) {
+                const basis = perpPrice - cboeSpotPrice;
+                const sign = basis >= 0 ? "+" : "-";
+                basisEl.innerText = `${sign}$${Math.abs(basis).toFixed(2)}`;
+                basisEl.className = `text-[10px] font-num px-1.5 py-0.2 rounded font-medium ${
+                    basis > 1.0 ? 'bg-rose-950/50 text-rose-400 border border-rose-800/50' :
+                    basis < -1.0 ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/50' :
+                    'bg-zinc-800 text-zinc-300'
+                }`;
+            } else {
+                basisEl.innerText = "BASIS --";
+                basisEl.className = "text-[10px] font-num px-1 rounded bg-zinc-800/80 text-zinc-500";
+            }
+        }
 
-            data.forEach(item => {
-                if (!item.instrument_name.includes(searchKey)) return;
-                let parts = item.instrument_name.split('-');
-                if (parts.length !== 4) return;
+        function updatePerpUI(newPrice, fundingRate = null) {
+            if (newPrice && newPrice > 0) {
+                perpPrice = newPrice;
+                const perpEl = document.getElementById('val-perp');
+                if (perpEl) perpEl.innerText = fmtPrice(perpPrice);
 
-                let strike = parseFloat(parts[2]);
-                let isCall = (parts[3] === 'C');
-                let oi = item.open_interest || 0;
-                let vol = item.volume || 0; 
-                let iv = (item.mark_iv || 0) / 100.0;
-                let underlying = item.underlying_price || item.estimated_delivery_price || 0;
+                const perpCard = document.getElementById('perp-card');
+                if (perpCard) {
+                    perpCard.classList.remove('flash-perp');
+                    void perpCard.offsetWidth;
+                    perpCard.classList.add('flash-perp');
+                }
+                updateBasisDisplay();
+            }
+            if (fundingRate !== null && fundingRate !== undefined && !isNaN(fundingRate)) {
+                const fundEl = document.getElementById('val-funding');
+                if (fundEl) {
+                    const pct = (fundingRate * 100).toFixed(4);
+                    fundEl.innerText = `F ${fundingRate >= 0 ? '+' : ''}${pct}%`;
+                    fundEl.className = `text-[10px] font-num ${fundingRate > 0.0001 ? 'text-zinc-300' : fundingRate < 0 ? 'text-zinc-300' : 'text-zinc-500'}`;
+                }
+            }
+        }
 
-                if (underlying > 0) underlyingPrices.push(underlying);
-                strikes.add(strike);
-                options.push({ strike, isCall, oi, vol, iv, underlying });
+        async function pollBinancePerpREST() {
+            const pair = `${currentSymbol}USDT`;
+            try {
+                const res = await fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${pair}`, { cache: "no-store" });
+                if (!res.ok) throw new Error("Not listed");
+                const d = await res.json();
+                if (d && d.markPrice) {
+                    updatePerpUI(parseFloat(d.markPrice), parseFloat(d.lastFundingRate));
+                }
+            } catch (e) {
+                if (perpPrice === 0) {
+                    const perpEl = document.getElementById('val-perp');
+                    if (perpEl) perpEl.innerHTML = `<span class="text-zinc-500 text-sm font-sans font-medium">미상장</span>`;
+                    document.getElementById('val-funding').innerText = "";
+                }
+            }
+        }
 
-                if (isCall) {
-                    callOiMap[strike] = (callOiMap[strike] || 0) + oi;
-                    callVolMap[strike] = (callVolMap[strike] || 0) + vol;
+        function connectBinanceWS() {
+            if (binanceWs) {
+                binanceWs.onclose = null;
+                binanceWs.close();
+                binanceWs = null;
+            }
+            if (binanceRestTimer) clearInterval(binanceRestTimer);
+
+            perpPrice = 0;
+            const pairLower = `${currentSymbol.toLowerCase()}usdt`;
+            document.getElementById('perp-source-label').innerText = `${currentSymbol}USDT PERP`;
+            document.getElementById('val-perp').innerText = "--";
+            document.getElementById('val-funding').innerText = "";
+            updateBasisDisplay();
+
+            pollBinancePerpREST();
+            binanceRestTimer = setInterval(pollBinancePerpREST, 10000);
+
+            try {
+                const streamUrl = `wss://fstream.binance.com/stream?streams=${pairLower}@aggTrade/${pairLower}@markPrice@1s`;
+                binanceWs = new WebSocket(streamUrl);
+                binanceWs.onmessage = (ev) => {
+                    try {
+                        const msg = JSON.parse(ev.data);
+                        if (!msg || !msg.data) return;
+                        if (msg.stream.endsWith('@aggTrade')) {
+                            updatePerpUI(parseFloat(msg.data.p), null);
+                        } else if (msg.stream.endsWith('@markPrice@1s')) {
+                            const fRate = parseFloat(msg.data.r);
+                            const pNow = perpPrice > 0 ? null : parseFloat(msg.data.p);
+                            updatePerpUI(pNow, fRate);
+                        }
+                    } catch (err) {}
+                };
+            } catch (e) {}
+        }
+
+        // ================= Cboe 옵션 체인 수신 =================
+        async function fetchWithCorsFallback(targetUrl) {
+            const routes = [];
+            if (customProxy && customProxy.trim().length > 0) {
+                routes.push({ name: "Proxy", build: u => customProxy.trim() + encodeURIComponent(u) });
+            }
+            routes.push(
+                { name: "Direct", build: u => u },
+                { name: "CorsProxy", build: u => `https://corsproxy.io/?${encodeURIComponent(u)}` },
+                { name: "AllOrigins", build: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
+                { name: "CodeTabs", build: u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}` }
+            );
+
+            const ordered = [];
+            if (preferredProxyIdx < routes.length) ordered.push({ idx: preferredProxyIdx, ...routes[preferredProxyIdx] });
+            routes.forEach((r, idx) => { if (idx !== preferredProxyIdx) ordered.push({ idx, ...r }); });
+
+            let sawHttpReject = false;
+            for (const route of ordered) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 12000);
+                    const res = await fetch(route.build(targetUrl), { cache: "no-store", signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    if (!res.ok) {
+                        if (route.name === "Proxy" || res.status === 404 || res.status === 403) {
+                            sawHttpReject = true;
+                            if (route.name === "Proxy") break;
+                        }
+                        throw new Error(`HTTP ${res.status}`);
+                    }
+                    const json = await res.json();
+                    if (json && json.data && Array.isArray(json.data.options)) {
+                        preferredProxyIdx = route.idx;
+                        return { json, routeName: route.name };
+                    }
+                } catch (err) {}
+            }
+            const finalErr = new Error(sawHttpReject ? "INVALID_TICKER" : "CORS_BLOCKED");
+            finalErr.code = sawHttpReject ? "INVALID_TICKER" : "CORS_BLOCKED";
+            throw finalErr;
+        }
+
+        function setFeedStatus(state, text) {
+            const el = document.getElementById('feed-status');
+            if (!el) return;
+            if (state === 'ok') {
+                el.className = "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 text-zinc-200 border border-zinc-700";
+                el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>${text}`;
+            } else if (state === 'loading') {
+                el.className = "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 text-zinc-300 border border-zinc-800";
+                el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1.5"></span>${text}`;
+            } else {
+                el.className = "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-rose-950/40 text-rose-400 border border-rose-800/60";
+                el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>${text}`;
+            }
+        }
+
+        async function fetchCboeChain(isManual = false) {
+            setFeedStatus('loading', isManual ? '갱신 중...' : '수신 중...');
+            const cboeSym = CBOE_INDEX_SET.has(currentSymbol) ? `_${currentSymbol}` : currentSymbol;
+            const cboeUrl = `https://cdn.cboe.com/api/global/delayed_quotes/options/${cboeSym}.json`;
+
+            try {
+                const { json, routeName } = await fetchWithCorsFallback(cboeUrl);
+                rawCboeChain = json;
+                upsertWatchlistSymbol(currentSymbol, dividendYield);
+                processFullChain(json);
+                setFeedStatus('ok', `Cboe (${routeName})`);
+                document.getElementById('val-update').innerText = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+                resetPollCountdown();
+            } catch (err) {
+                if (err && err.code === "INVALID_TICKER") {
+                    setFeedStatus('err', `티커 없음 (${currentSymbol})`);
+                    const sumRow0 = document.getElementById('sum-row-0dte');
+                    if (sumRow0) sumRow0.innerHTML = `<td colspan="8" class="py-2 px-2 text-rose-400 font-sans">Cboe에 '${currentSymbol}' 옵션 체인이 존재하지 않습니다. 티커 철자를 확인해 주세요.</td>`;
                 } else {
-                    putOiMap[strike] = (putOiMap[strike] || 0) + oi;
-                    putVolMap[strike] = (putVolMap[strike] || 0) + vol;
+                    setFeedStatus('err', 'CORS 차단 (설정 확인)');
+                }
+            }
+        }
+
+        function handleLocalJsonFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    if (json && json.data && Array.isArray(json.data.options)) {
+                        const firstOcc = json.data.options.length > 0 ? parseOccSymbol(json.data.options[0].option) : null;
+                        if (firstOcc && json.data.options[0].option) {
+                            const rootMatch = json.data.options[0].option.trim().match(/^([A-Z0-9._]+?)\d{6}[CP]/);
+                            if (rootMatch && rootMatch[1]) {
+                                currentSymbol = rootMatch[1].replace(/^_/, '');
+                                document.getElementById('title-symbol').innerText = currentSymbol;
+                                document.getElementById('inp-custom-sym').value = currentSymbol;
+                                upsertWatchlistSymbol(currentSymbol, dividendYield);
+                            }
+                        }
+                        rawCboeChain = json;
+                        processFullChain(json);
+                        setFeedStatus('ok', '로컬 JSON');
+                        document.getElementById('val-update').innerText = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+                    }
+                } catch (err) {
+                    alert("유효한 Cboe 옵션 JSON 파일이 아닙니다.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function resetPollCountdown() {
+            nextPollAt = Date.now() + POLL_INTERVAL_MS;
+            if (cboePollTimer) clearTimeout(cboePollTimer);
+            cboePollTimer = setTimeout(() => fetchCboeChain(false), POLL_INTERVAL_MS);
+
+            if (!countdownTimer) {
+                countdownTimer = setInterval(() => {
+                    const rem = Math.max(0, Math.floor((nextPollAt - Date.now()) / 1000));
+                    const m = Math.floor(rem / 60);
+                    const s = String(rem % 60).padStart(2, '0');
+                    const cdEl = document.getElementById('val-countdown');
+                    if (cdEl) cdEl.innerText = `(${m}:${s})`;
+                }, 1000);
+            }
+        }
+
+        // ================= 30일 등가격(ATM) 내재변동성 산출 =================
+        function computeAtmIv30(parsedList, expMap, spotRef, evalTimeMs) {
+            if (!spotRef || spotRef <= 0) return 0;
+            const exps = Object.values(expMap)
+                .map(e => ({ ...e, dte: (e.dt.getTime() - evalTimeMs) / (1000 * 3600 * 24) }))
+                .filter(e => e.dte >= 5 && e.dte <= 75)
+                .sort((a, b) => Math.abs(a.dte - 30) - Math.abs(b.dte - 30));
+
+            if (exps.length === 0) return 0;
+            const targetExp = exps[0].expStr;
+            const nearAtm = parsedList
+                .filter(o => o.expStr === targetExp && o.iv > 0.01 && Math.abs(o.strike - spotRef) / spotRef < 0.03)
+                .sort((a, b) => Math.abs(a.strike - spotRef) - Math.abs(b.strike - spotRef))
+                .slice(0, 4);
+
+            if (nearAtm.length === 0) return 0;
+            const avgIv = nearAtm.reduce((acc, o) => acc + o.iv, 0) / nearAtm.length;
+            return avgIv * 100.0;
+        }
+
+        // ================= 메인 체인 파싱 및 4-Tier 퀀트 엔진 =================
+        function processFullChain(cboePayload) {
+            const dataObj = cboePayload.data || {};
+            const clockState = getSessionClockState();
+
+            const clockBadge = document.getElementById('clock-mode-badge');
+            if (clockBadge) {
+                clockBadge.innerText = clockState.badgeText;
+                clockBadge.className = `px-2 py-0.5 rounded text-[10px] font-medium border ${clockState.badgeStyle}`;
+            }
+
+            if (dataObj.current_price) {
+                cboeSpotPrice = parseFloat(dataObj.current_price);
+                document.getElementById('spot-label').innerText = `${currentSymbol} SPOT`;
+                document.getElementById('val-spot').innerText = fmtPrice(cboeSpotPrice);
+
+                const spotCard = document.getElementById('spot-card');
+                spotCard.classList.remove('flash-spot');
+                void spotCard.offsetWidth;
+                spotCard.classList.add('flash-spot');
+                updateBasisDisplay();
+            }
+
+            const spotRef = getEffectiveSpot();
+            const rawOptions = dataObj.options || [];
+            const expMap = {};
+            const parsedOptions = [];
+
+            for (let i = 0; i < rawOptions.length; i++) {
+                const item = rawOptions[i];
+                const occ = parseOccSymbol(item.option);
+                if (!occ) continue;
+
+                if (!expMap[occ.expStr]) {
+                    expMap[occ.expStr] = {
+                        expStr: occ.expStr,
+                        yyyy: occ.yyyy,
+                        mm: occ.mm,
+                        dd: occ.dd,
+                        dt: getNYCloseUTC(occ.yyyy, occ.mm, occ.dd)
+                    };
+                }
+
+                let rawIv = parseFloat(item.iv) || 0;
+                let iv = rawIv > 5.0 ? rawIv / 100.0 : rawIv;
+                let oi = parseFloat(item.open_interest) || 0;
+                let vol = parseFloat(item.volume) || 0;
+
+                parsedOptions.push({
+                    expStr: occ.expStr,
+                    strike: occ.strike,
+                    isCall: occ.isCall,
+                    oi,
+                    vol,
+                    iv,
+                    ivInterpolated: false
+                });
+            }
+
+            currentAtmIv30 = computeAtmIv30(parsedOptions, expMap, spotRef, clockState.evalTimeMs);
+            document.getElementById('val-iv').innerText = currentAtmIv30 > 0 ? currentAtmIv30.toFixed(2) + "%" : "--";
+
+            interpolateMissingIVs(parsedOptions, currentAtmIv30 / 100.0);
+
+            const snap = getSavedSnapshot();
+            if (snap) {
+                if (snap.spotPrice && spotRef > 0) {
+                    const dSpot = spotRef - snap.spotPrice;
+                    const el = document.getElementById('snap-diff-spot');
+                    el.innerText = `${dSpot >= 0 ? '+' : ''}${dSpot.toFixed(2)}`;
+                    el.className = `text-[10px] font-num ${dSpot >= 0 ? 'text-pos' : 'text-neg'}`;
+                }
+                if (snap.iv30 && currentAtmIv30 > 0) {
+                    const dIv = currentAtmIv30 - snap.iv30;
+                    const el = document.getElementById('snap-diff-iv');
+                    el.innerText = `${dIv >= 0 ? '+' : ''}${dIv.toFixed(2)}%p`;
+                    el.className = `text-[10px] font-num ${dIv >= 0 ? 'text-neg' : 'text-pos'}`;
+                }
+            }
+
+            const selected = selectFourTiers(expMap, clockState);
+            if (!selected) return;
+
+            const cadEl = document.getElementById('cadence-badge');
+            if (cadEl) {
+                cadEl.innerText = selected.cadenceInfo.badge;
+                cadEl.className = `px-2 py-0.5 rounded text-[11px] font-medium border ${selected.cadenceInfo.style}`;
+            }
+
+            const { l0, l1, lM, lNM } = selected.labels;
+            document.getElementById('tab-title-0dte').innerText = l0;
+            document.getElementById('tab-title-1dte').innerText = l1;
+            document.getElementById('tab-title-monthly').innerText = lM;
+            document.getElementById('tab-title-nextmonth').innerText = lNM;
+
+            document.getElementById('0dte-panel-title').innerText = `${l0} 미시구조 지표`;
+            document.getElementById('1dte-panel-title').innerText = `${l1} 미시구조 지표`;
+            document.getElementById('monthly-panel-title').innerText = `${lM} 미시구조 지표`;
+            document.getElementById('nextmonth-panel-title').innerText = `${lNM} 미시구조 지표`;
+
+            document.getElementById('tab-sub-0dte').innerText = `${selected.exp0.expStr} · ${selected.exp0.desc}`;
+            document.getElementById('tab-sub-1dte').innerText = `${selected.exp1.expStr} · ${selected.exp1.desc}`;
+            document.getElementById('tab-sub-monthly').innerText = `${selected.expM.expStr} · ${selected.expM.desc}`;
+            document.getElementById('tab-sub-nextmonth').innerText = `${selected.expNM.expStr} · ${selected.expNM.desc}`;
+
+            document.getElementById('0dte-expiry-badge').innerText = `${selected.exp0.expStr} · ${selected.exp0.desc}`;
+            document.getElementById('1dte-expiry-badge').innerText = `${selected.exp1.expStr} · ${selected.exp1.desc}`;
+            document.getElementById('monthly-expiry-badge').innerText = `${selected.expM.expStr} · ${selected.expM.desc}`;
+            document.getElementById('nextmonth-expiry-badge').innerText = `${selected.expNM.expStr} · ${selected.expNM.desc}`;
+
+            latestMetrics = {};
+            runQuantEngine(parsedOptions, selected.exp0, spotRef, clockState, "0dte", l0);
+            runQuantEngine(parsedOptions, selected.exp1, spotRef, clockState, "1dte", l1);
+            runQuantEngine(parsedOptions, selected.expM, spotRef, clockState, "monthly", lM);
+            runQuantEngine(parsedOptions, selected.expNM, spotRef, clockState, "nextmonth", lNM);
+
+            switchTab(currentActiveTab);
+        }
+
+        function runQuantEngine(allOptions, expInfo, spotRef, clockState, prefixId, tierLabel) {
+            const options = allOptions.filter(o => o.expStr === expInfo.expStr);
+            if (options.length === 0 || spotRef <= 0) return;
+
+            const strikes = new Set();
+            const callOiMap = {}, putOiMap = {};
+            const callVolMap = {}, putVolMap = {};
+
+            options.forEach(opt => {
+                strikes.add(opt.strike);
+                if (opt.isCall) {
+                    callOiMap[opt.strike] = (callOiMap[opt.strike] || 0) + opt.oi;
+                    callVolMap[opt.strike] = (callVolMap[opt.strike] || 0) + opt.vol;
+                } else {
+                    putOiMap[opt.strike] = (putOiMap[opt.strike] || 0) + opt.oi;
+                    putVolMap[opt.strike] = (putVolMap[opt.strike] || 0) + opt.vol;
                 }
             });
 
-            if (options.length === 0) return; 
+            const totalCallOi = Object.values(callOiMap).reduce((a, b) => a + b, 0);
+            const totalPutOi = Object.values(putOiMap).reduce((a, b) => a + b, 0);
+            const totalCallVol = Object.values(callVolMap).reduce((a, b) => a + b, 0);
+            const totalPutVol = Object.values(putVolMap).reduce((a, b) => a + b, 0);
+            const pcr = totalCallOi > 0 ? (totalPutOi / totalCallOi) : 0;
+            const volPcr = totalCallVol > 0 ? (totalPutVol / totalCallVol) : 0;
 
-            let btcRef = underlyingPrices.length > 0 ? (underlyingPrices.reduce((a, b) => a + b, 0) / underlyingPrices.length) : (btcPrice > 0 ? btcPrice : 0);
+            const totalOiSum = totalCallOi + totalPutOi;
+            const totalVolSum = totalCallVol + totalPutVol;
+            const isPreSettlementLag = !clockState.isRegularOpen && totalVolSum > 1000 && (totalVolSum / Math.max(1, totalOiSum)) > 1.5;
 
-            let totalCallOi = Object.values(callOiMap).reduce((a, b) => a + b, 0);
-            let totalPutOi = Object.values(putOiMap).reduce((a, b) => a + b, 0);
-            let pcr = totalCallOi > 0 ? (totalPutOi / totalCallOi) : 0;
+            const oiNoticeEl = document.getElementById(`${prefixId}-oi-lag-notice`);
+            if (oiNoticeEl) {
+                if (isPreSettlementLag) {
+                    oiNoticeEl.innerHTML = `<span class="px-2 py-0.5 rounded bg-amber-950/40 border border-amber-800/50 text-amber-300/90 font-medium">직전장 거래량(${fmtNum(totalVolSum)}) 정산 대기 · 우측 Vol 병행 확인</span>`;
+                } else {
+                    oiNoticeEl.innerHTML = `OCC 정산 누적 미결제약정 순 (단위: 계약)`;
+                }
+            }
 
-            let minPain = Infinity; let maxPainStrike = 0;
+            // Max Pain
+            let minPain = Infinity, maxPainStrike = 0;
             strikes.forEach(K => {
                 let pain = 0;
-                options.forEach(opt => {
+                for (let i = 0; i < options.length; i++) {
+                    const opt = options[i];
+                    if (opt.oi <= 0) continue;
                     if (opt.isCall && K > opt.strike) pain += (K - opt.strike) * opt.oi;
                     else if (!opt.isCall && K < opt.strike) pain += (opt.strike - K) * opt.oi;
-                });
+                }
                 if (pain < minPain) { minPain = pain; maxPainStrike = K; }
             });
 
-            let now = new Date();
-            let T_years = Math.max((expInfo.dt.getTime() - now.getTime()) / (1000 * 3600 * 24 * 365), 0.0001);
-            
-            let netD = 0, netG = 0;
-            let netTheta = 0, netVega = 0, netVanna = 0, netCharm = 0;
+            const T_years = Math.max((expInfo.dt.getTime() - clockState.evalTimeMs) / (1000 * 3600 * 24 * 365), 0.00006);
 
-            options.forEach(opt => {
-                let S = opt.underlying || btcRef;
-                let greeks = calc_advanced_greeks(S, opt.strike, T_years, opt.iv, opt.isCall);
-                opt.delta = greeks.delta; 
-                
-                netD += greeks.delta * opt.oi;
-                
-                // 딜러 포지션 승수 (크립토 옵션 시장 수급: 콜 매도 우세 -> 딜러 Long Call(+1), 풋 매수 헤지 우세 -> 딜러 Short Put(-1))
-                let dealerMultiplier = opt.isCall ? 1.0 : -1.0;
-                let dollarGamma = (greeks.gamma * S * S * 0.01) * opt.oi * dealerMultiplier;
-                netG += dollarGamma;
-                
-                netTheta += greeks.theta * opt.oi;
-                netVega += greeks.vega * opt.oi;
-                // [수정] Vanna와 Charm에 딜러 포지션 방향성(승수) 적용
-                netVanna += greeks.vanna * opt.oi * dealerMultiplier;
-                netCharm += greeks.charm * opt.oi * dealerMultiplier;
-            });
+            let netD = 0, netG = 0, netTheta = 0, netVega = 0, netVanna = 0, netCharm = 0;
 
-            let scanRange = 0.30;
-            let step = Math.max(50.0, Math.round(btcRef * 0.001));
-            let minPrice = btcRef * (1 - scanRange), maxPrice = btcRef * (1 + scanRange);
-            
+            for (let i = 0; i < options.length; i++) {
+                const opt = options[i];
+                const g = calc_bsm_advanced(spotRef, opt.strike, T_years, riskFreeRate, dividendYield, opt.iv, opt.isCall);
+                opt.delta = g.delta;
+                if (opt.oi <= 0) continue;
+
+                const contractsShares = opt.oi * CONTRACT_MULTIPLIER;
+                const dealerMult = getDealerMultiplier(opt.isCall);
+
+                netD += g.delta * contractsShares;
+                netG += (g.gamma * spotRef * spotRef * 0.01) * contractsShares * dealerMult;
+                netTheta += g.theta * contractsShares;
+                netVega += g.vega * contractsShares;
+                netVanna += g.vanna * contractsShares * dealerMult;
+                netCharm += g.charm * contractsShares * dealerMult;
+            }
+
+            // Zero Gamma / Zero Delta 스캔
+            const scanRange = 0.20;
+            const step = Math.max(0.25, parseFloat((spotRef * 0.001).toFixed(2)));
+            const minPrice = spotRef * (1 - scanRange);
+            const maxPrice = spotRef * (1 + scanRange);
+
             let prevGex = null, prevNetD = null, prevPrice = null;
-            let gexCrossings = [], deltaCrossings = [];
+            const gexCrossings = [], deltaCrossings = [];
 
-            for (let simPrice = minPrice; simPrice <= maxPrice; simPrice += step) {
+            for (let simP = minPrice; simP <= maxPrice; simP += step) {
                 let simNetD = 0, simNetGex = 0;
-                options.forEach(opt => {
-                    let simGreeks = calculate_greeks(simPrice, opt.strike, T_years, opt.iv, opt.isCall);
-                    simNetD += simGreeks.delta * opt.oi;
-                    simNetGex += (simGreeks.gamma * simPrice * simPrice * 0.01) * opt.oi * (opt.isCall ? 1.0 : -1.0);
-                });
+                for (let i = 0; i < options.length; i++) {
+                    const opt = options[i];
+                    if (opt.oi <= 0) continue;
+                    const sg = calc_bsm_fast(simP, opt.strike, T_years, riskFreeRate, dividendYield, opt.iv, opt.isCall);
+                    const cs = opt.oi * CONTRACT_MULTIPLIER;
+                    simNetD += sg.delta * cs;
+                    simNetGex += (sg.gamma * simP * simP * 0.01) * cs * getDealerMultiplier(opt.isCall);
+                }
 
                 if (prevNetD !== null && ((prevNetD < 0 && simNetD >= 0) || (prevNetD > 0 && simNetD <= 0)) && Math.abs(prevNetD - simNetD) > 0) {
-                    let ratio = Math.abs(prevNetD) / (Math.abs(prevNetD) + Math.abs(simNetD));
+                    const ratio = Math.abs(prevNetD) / (Math.abs(prevNetD) + Math.abs(simNetD));
                     deltaCrossings.push(prevPrice + ratio * step);
                 }
-
                 if (prevGex !== null && ((prevGex < 0 && simNetGex >= 0) || (prevGex > 0 && simNetGex <= 0)) && Math.abs(prevGex - simNetGex) > 0) {
-                    let ratio = Math.abs(prevGex) / (Math.abs(prevGex) + Math.abs(simNetGex));
+                    const ratio = Math.abs(prevGex) / (Math.abs(prevGex) + Math.abs(simNetGex));
                     gexCrossings.push(prevPrice + ratio * step);
                 }
-
-                prevGex = simNetGex; 
+                prevGex = simNetGex;
                 prevNetD = simNetD;
-                prevPrice = simPrice;
+                prevPrice = simP;
             }
 
-            let zeroDeltaPrice = deltaCrossings.length > 0 
-                ? deltaCrossings.reduce((prev, curr) => Math.abs(curr - btcRef) < Math.abs(prev - btcRef) ? curr : prev) 
+            const zeroDeltaPrice = deltaCrossings.length > 0
+                ? deltaCrossings.reduce((p, c) => Math.abs(c - spotRef) < Math.abs(p - spotRef) ? c : p)
+                : 0;
+            const zeroGammaPrice = gexCrossings.length > 0
+                ? gexCrossings.reduce((p, c) => Math.abs(c - spotRef) < Math.abs(p - spotRef) ? c : p)
                 : 0;
 
-            let zeroGammaPrice = gexCrossings.length > 0 
-                ? gexCrossings.reduce((prev, curr) => Math.abs(curr - btcRef) < Math.abs(prev - btcRef) ? curr : prev) 
-                : 0;
-
-            let activeCalls = options.filter(o => o.isCall && o.oi > 0 && o.iv > 0);
-            let activePuts = options.filter(o => !o.isCall && o.oi > 0 && o.iv > 0);
+            // 25D Skew
+            const activeCalls = options.filter(o => o.isCall && o.oi > 0 && o.iv > 0.01 && !o.ivInterpolated);
+            const activePuts = options.filter(o => !o.isCall && o.oi > 0 && o.iv > 0.01 && !o.ivInterpolated);
             let skew = 0;
             if (activeCalls.length > 0 && activePuts.length > 0) {
-                let call25 = activeCalls.reduce((prev, curr) => Math.abs(curr.delta - 0.25) < Math.abs(prev.delta - 0.25) ? curr : prev);
-                let put25 = activePuts.reduce((prev, curr) => Math.abs(curr.delta - (-0.25)) < Math.abs(prev.delta - (-0.25)) ? curr : prev);
-                skew = (put25.iv - call25.iv) * 100;
+                const call25 = activeCalls.reduce((p, c) => Math.abs(c.delta - 0.25) < Math.abs(p.delta - 0.25) ? c : p);
+                const put25 = activePuts.reduce((p, c) => Math.abs(c.delta - (-0.25)) < Math.abs(p.delta - (-0.25)) ? c : p);
+                skew = (put25.iv - call25.iv) * 100.0;
             }
 
-            // [핵심 수정] 고정 탭 이름(prefixId) 대신 만기일 코드(expInfo.str)를 키로 사용하여 만기 전환 시 스냅샷 자동 승계
-            latestMetrics[expInfo.str] = {
+            latestMetrics[expInfo.expStr] = {
                 maxPainStrike, zeroGammaPrice, zeroDeltaPrice, netG, netD, skew, pcr, netVega, netTheta, netVanna, netCharm
             };
 
-            document.getElementById(`${prefixId}-maxpain`).innerText = fmtMoney(maxPainStrike);
+            // 카드 UI 업데이트
+            document.getElementById(`${prefixId}-maxpain`).innerText = fmtStrike(maxPainStrike);
+            document.getElementById(`${prefixId}-zerodelta`).innerText = zeroDeltaPrice > 0 ? fmtPrice(zeroDeltaPrice) : "범위 외";
+            document.getElementById(`${prefixId}-zerogamma`).innerText = zeroGammaPrice > 0 ? fmtPrice(zeroGammaPrice) : "범위 외";
             document.getElementById(`${prefixId}-pcr`).innerText = pcr.toFixed(2);
-            
-            let skewEl = document.getElementById(`${prefixId}-skew`);
-            if(skewEl) {
-                skewEl.innerText = (skew > 0 ? "+" : "") + skew.toFixed(2) + "%";
-                skewEl.className = `text-lg font-bold font-mono ${skew > 0 ? 'text-down' : 'text-up'}`;
-            }
-            
-            let ndEl = document.getElementById(`${prefixId}-netdelta`);
-            let ndSubEl = document.getElementById(`${prefixId}-netdelta-sub`);
-            if(ndEl) {
-                ndEl.innerText = fmtLarge(netD) + " BTC";
-                ndEl.className = `text-lg font-bold font-mono ${netD >= 0 ? 'text-up' : 'text-down'}`;
-            }
-            if(ndSubEl) {
-                ndSubEl.innerText = netD >= 0 ? "롱 델타 우세 (상방)" : "숏 델타 우세 (하방)";
-            }
-            
-            let ngEl = document.getElementById(`${prefixId}-netgamma`);
-            let ngSubEl = document.getElementById(`${prefixId}-netgamma-sub`);
-            if(ngEl) {
-                ngEl.innerText = fmtLargeUSD(netG);
-                ngEl.className = `text-lg font-bold font-mono ${netG >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
-            }
-            if(ngSubEl) {
-                ngSubEl.innerText = netG >= 0 ? "변동성 완화 (쿠션)" : "추세 가속 (스퀴즈)";
-            }
+            document.getElementById(`${prefixId}-pcr-sub`).innerText = `OI ${pcr.toFixed(2)} · Vol ${volPcr.toFixed(2)}`;
+
+            const skewEl = document.getElementById(`${prefixId}-skew`);
+            skewEl.innerText = (skew > 0 ? "+" : "") + skew.toFixed(2) + "%p";
+            skewEl.className = `text-lg font-bold font-num ${skew > 0 ? 'text-neg' : 'text-pos'}`;
+
+            const ndEl = document.getElementById(`${prefixId}-netdelta`);
+            const ndSubEl = document.getElementById(`${prefixId}-netdelta-sub`);
+            ndEl.innerText = fmtLarge(netD) + " sh";
+            ndEl.className = `text-lg font-bold font-num ${netD >= 0 ? 'text-pos' : 'text-neg'}`;
+            ndSubEl.innerText = `${fmtLargeUSD(netD * spotRef)} (${netD >= 0 ? '롱 우세' : '숏 우세'})`;
+
+            const ngEl = document.getElementById(`${prefixId}-netgamma`);
+            const ngSubEl = document.getElementById(`${prefixId}-netgamma-sub`);
+            ngEl.innerText = fmtLargeUSD(netG);
+            ngEl.className = `text-lg font-bold font-num ${netG >= 0 ? 'text-pos' : 'text-neg'}`;
+            ngSubEl.innerText = netG >= 0 ? "변동성 완화 (완충)" : "추세 가속 (스퀴즈)";
 
             document.getElementById(`${prefixId}-netvega`).innerText = fmtLargeUSD(netVega) + " /1%";
             document.getElementById(`${prefixId}-nettheta`).innerText = fmtLargeUSD(netTheta) + " /일";
-            let vannaEl = document.getElementById(`${prefixId}-netvanna`);
-            if (vannaEl) {
-                vannaEl.innerText = fmtLarge(netVanna) + " Δ/1%";
-                vannaEl.className = `text-xs font-bold font-mono ${netVanna >= 0 ? 'text-purple-300' : 'text-purple-400'}`;
-            }
-            let charmEl = document.getElementById(`${prefixId}-netcharm`);
-            if (charmEl) {
-                charmEl.innerText = fmtLarge(netCharm) + " Δ/일";
-                charmEl.className = `text-xs font-bold font-mono ${netCharm >= 0 ? 'text-emerald-300' : 'text-emerald-400'}`;
-            }
 
-            document.getElementById(`${prefixId}-zerodelta`).innerText = zeroDeltaPrice > 0 ? fmtMoney(zeroDeltaPrice) : "범위 외";
-            document.getElementById(`${prefixId}-zerogamma`).innerText = zeroGammaPrice > 0 ? fmtMoney(zeroGammaPrice) : "범위 외";
+            const vannaEl = document.getElementById(`${prefixId}-netvanna`);
+            vannaEl.innerText = fmtLarge(netVanna) + " sh/1%";
+            vannaEl.className = `text-xs font-semibold font-num ${netVanna >= 0 ? 'text-pos' : 'text-neg'}`;
 
-            // [핵심 수정] 만기일 코드(expInfo.str) 기준으로 스냅샷 조회 및 미존재 시 배지 클리어
+            const charmEl = document.getElementById(`${prefixId}-netcharm`);
+            charmEl.innerText = fmtLarge(netCharm) + " sh/일";
+            charmEl.className = `text-xs font-semibold font-num ${netCharm >= 0 ? 'text-pos' : 'text-neg'}`;
+
+            // 스냅샷 증감 배지 표시
             const snap = getSavedSnapshot();
-            if (snap && snap.tiers && snap.tiers[expInfo.str]) {
-                const prev = snap.tiers[expInfo.str];
-                renderDiffBadge(`${prefixId}-diff-maxpain`, maxPainStrike - prev.maxPainStrike, v => (v > 0 ? "+$" : "-$") + Math.abs(Math.round(v)));
-                renderDiffBadge(`${prefixId}-diff-zerogamma`, zeroGammaPrice - prev.zeroGammaPrice, v => (v > 0 ? "+$" : "-$") + Math.abs(Math.round(v)));
-                renderDiffBadge(`${prefixId}-diff-zerodelta`, zeroDeltaPrice - prev.zeroDeltaPrice, v => (v > 0 ? "+$" : "-$") + Math.abs(Math.round(v)));
+            if (snap && snap.tiers && snap.tiers[expInfo.expStr]) {
+                const prev = snap.tiers[expInfo.expStr];
+                renderDiffBadge(`${prefixId}-diff-maxpain`, maxPainStrike - prev.maxPainStrike, v => (v > 0 ? "+$" : "-$") + Math.abs(v).toFixed(1));
+                renderDiffBadge(`${prefixId}-diff-zerogamma`, zeroGammaPrice - prev.zeroGammaPrice, v => (v > 0 ? "+$" : "-$") + Math.abs(v).toFixed(2));
+                renderDiffBadge(`${prefixId}-diff-zerodelta`, zeroDeltaPrice - prev.zeroDeltaPrice, v => (v > 0 ? "+$" : "-$") + Math.abs(v).toFixed(2));
                 renderDiffBadge(`${prefixId}-diff-netgamma`, netG - prev.netG, fmtLargeUSD);
-                renderDiffBadge(`${prefixId}-diff-netdelta`, netD - prev.netD, v => fmtLarge(v));
+                renderDiffBadge(`${prefixId}-diff-netdelta`, netD - prev.netD, fmtLarge);
                 renderDiffBadge(`${prefixId}-diff-skew`, skew - prev.skew, v => (v > 0 ? "+" : "") + v.toFixed(2) + "%p", 'skew');
                 renderDiffBadge(`${prefixId}-diff-pcr`, pcr - prev.pcr, v => (v > 0 ? "+" : "") + v.toFixed(2), 'skew');
                 renderDiffBadge(`${prefixId}-diff-netvega`, netVega - prev.netVega, fmtLargeUSD);
@@ -1091,107 +1881,198 @@
                 clearTierDiffBadges(prefixId);
             }
 
-            let regimeBanner = document.getElementById(`${prefixId}-regime-banner`);
-            if (regimeBanner) {
-                if (netG >= 0) {
-                    regimeBanner.className = "w-full md:w-auto px-3.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-3 bg-emerald-950/40 border-emerald-500/40 text-emerald-300";
-                    regimeBanner.innerHTML = `
-                        <div class="flex items-center gap-2">
-                            <span class="text-emerald-400">🛡️ [포지티브 감마] 변동성 억제 국면</span>
-                            <span class="text-gray-400 font-normal hidden sm:inline">| 상승 시 매도, 하락 시 매수 완충 작동</span>
-                        </div>
-                        <span class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold">C/P-Wall 쿠션 작동</span>
-                    `;
-                } else {
-                    regimeBanner.className = "w-full md:w-auto px-3.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-3 bg-rose-950/40 border-rose-500/40 text-rose-300";
-                    regimeBanner.innerHTML = `
-                        <div class="flex items-center gap-2">
-                            <span class="text-rose-400">⚡ [네거티브 감마] 추세 가속/스퀴즈 국면</span>
-                            <span class="text-gray-400 font-normal hidden sm:inline">| 돌파 시 추격 매수/매도 수급 집중</span>
-                        </div>
-                        <span class="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">돌파시 연료화 경계</span>
-                    `;
-                }
+            // 레짐 배너
+            const regimeBanner = document.getElementById(`${prefixId}-regime-banner`);
+            if (netG >= 0) {
+                regimeBanner.className = "w-full md:w-auto px-3 py-1 rounded border text-xs font-medium flex items-center justify-between gap-3 bg-emerald-950/30 border-emerald-800/50 text-emerald-300";
+                regimeBanner.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span>POSITIVE GAMMA · 변동성 억제 국면</span>
+                        <span class="text-zinc-400 font-normal hidden sm:inline">| 역추세 완충 헤징 우위</span>
+                    </div>`;
+            } else {
+                regimeBanner.className = "w-full md:w-auto px-3 py-1 rounded border text-xs font-medium flex items-center justify-between gap-3 bg-rose-950/30 border-rose-800/50 text-rose-300";
+                regimeBanner.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                        <span>NEGATIVE GAMMA · 추세 가속 국면</span>
+                        <span class="text-zinc-400 font-normal hidden sm:inline">| 방향성 돌파 시 추격 헤징 가세</span>
+                    </div>`;
             }
 
-            let sortedCalls = Object.entries(callOiMap).sort((a,b) => b[1] - a[1]).slice(0, 10);
-            let sortedPuts = Object.entries(putOiMap).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            const sortedCalls = Object.entries(callOiMap).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            const sortedPuts = Object.entries(putOiMap).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
-            let topCWallStr = sortedCalls.length > 0 ? `${fmtMoney(parseFloat(sortedCalls[0][0]))} (${fmtNum(sortedCalls[0][1])})` : "-";
-            let topPWallStr = sortedPuts.length > 0 ? `${fmtMoney(parseFloat(sortedPuts[0][0]))} (${fmtNum(sortedPuts[0][1])})` : "-";
+            const topCWallStr = sortedCalls.length > 0 ? `${fmtStrike(parseFloat(sortedCalls[0][0]))} (${fmtNum(sortedCalls[0][1])})` : "-";
+            const topPWallStr = sortedPuts.length > 0 ? `${fmtStrike(parseFloat(sortedPuts[0][0]))} (${fmtNum(sortedPuts[0][1])})` : "-";
 
-            let sumRow = document.getElementById(`sum-row-${prefixId}`);
+            const sumRow = document.getElementById(`sum-row-${prefixId}`);
             if (sumRow) {
+                const lagTag = isPreSettlementLag ? `<span class="ml-1.5 px-1 py-0.2 text-[9px] rounded bg-amber-950/60 text-amber-400 border border-amber-800/50 font-sans" title="직전장 거래량 OCC 정산 대기중">정산대기</span>` : "";
                 sumRow.innerHTML = `
-                    <td class="py-1.5 px-2 font-bold text-white">${tierLabel} <span class="text-[10px] text-gray-500 font-normal">${expInfo.str}</span></td>
-                    <td class="py-1.5 px-2 font-bold text-yellow-400">${zeroGammaPrice > 0 ? fmtMoney(zeroGammaPrice) : '-'}</td>
-                    <td class="py-1.5 px-2 font-bold text-gray-200">${zeroDeltaPrice > 0 ? fmtMoney(zeroDeltaPrice) : '-'}</td>
-                    <td class="py-1.5 px-2 text-gray-400">${fmtMoney(maxPainStrike)}</td>
-                    <td class="py-1.5 px-2 font-bold ${netG >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${fmtLargeUSD(netG)}</td>
-                    <td class="py-1.5 px-2 font-bold ${netD >= 0 ? 'text-up' : 'text-down'}">${fmtLarge(netD)} BTC</td>
-                    <td class="py-1.5 px-2 font-bold ${skew > 0 ? 'text-down' : 'text-up'}">${(skew > 0 ? "+" : "") + skew.toFixed(2)}%</td>
-                    <td class="py-1.5 px-2"><span class="text-emerald-400">${topPWallStr}</span> <span class="text-gray-600">~</span> <span class="text-rose-400">${topCWallStr}</span></td>
+                    <td class="py-2 px-2 font-sans font-semibold text-zinc-200">${tierLabel} <span class="text-[11px] text-zinc-500 font-num font-normal ml-1">${expInfo.expStr}</span>${lagTag}</td>
+                    <td class="py-2 px-2 font-semibold text-pivot">${zeroGammaPrice > 0 ? fmtPrice(zeroGammaPrice) : '-'}</td>
+                    <td class="py-2 px-2 font-medium text-zinc-200">${zeroDeltaPrice > 0 ? fmtPrice(zeroDeltaPrice) : '-'}</td>
+                    <td class="py-2 px-2 text-zinc-400">${fmtStrike(maxPainStrike)}</td>
+                    <td class="py-2 px-2 font-semibold ${netG >= 0 ? 'text-pos' : 'text-neg'}">${fmtLargeUSD(netG)}</td>
+                    <td class="py-2 px-2 font-medium ${netD >= 0 ? 'text-pos' : 'text-neg'}">${fmtLarge(netD)} sh</td>
+                    <td class="py-2 px-2 font-medium ${skew > 0 ? 'text-neg' : 'text-pos'}">${(skew > 0 ? "+" : "") + skew.toFixed(2)}%p</td>
+                    <td class="py-2 px-2"><span class="text-pos">${topPWallStr}</span> <span class="text-zinc-600">–</span> <span class="text-neg">${topCWallStr}</span></td>
                 `;
             }
 
-            let renderOiTop10 = (sortedList, mapVol, elId, isCall) => {
+            // 수평 매물 뎁스 바가 적용된 OI Top 10 렌더링
+            const renderOiTop10 = (sortedList, mapVol, elId, isCall) => {
+                const tbody = document.getElementById(elId);
                 if (sortedList.length === 0) {
-                    document.getElementById(elId).innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500 text-xs">- 데이터 없음 -</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-5 text-zinc-600 font-sans text-xs">데이터 없음</td></tr>`;
                     return;
                 }
+                const maxOi = Math.max(...sortedList.map(x => x[1]), 1);
+                const barRgb = isCall ? "244, 63, 94" : "16, 185, 129";
 
-                document.getElementById(elId).innerHTML = sortedList.map(([strikeStr, oi], idx) => {
-                    let strike = parseFloat(strikeStr);
-                    let vol = mapVol[strike] || 0;
-                    let rankBadge = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `<span class="text-gray-500 font-mono text-[11px]">${idx + 1}</span>`;
-                    let strikeColor = isCall ? "text-rose-300" : "text-emerald-300";
+                tbody.innerHTML = sortedList.map(([strikeStr, oi], idx) => {
+                    const strike = parseFloat(strikeStr);
+                    const vol = mapVol[strike] || 0;
+                    const pct = Math.min(100, Math.round((oi / maxOi) * 100));
+                    const rankCls = idx < 3 ? "text-zinc-200 font-semibold" : "text-zinc-500";
+                    const strikeCls = isCall ? "text-rose-400" : "text-emerald-400";
+                    const rowBg = `background: linear-gradient(to left, rgba(${barRgb}, 0.11) ${pct}%, transparent ${pct}%);`;
 
                     return `
-                    <tr class="hover:bg-white/5 transition-colors">
-                        <td class="py-1.5 px-1 text-center">${rankBadge}</td>
-                        <td class="py-1.5 px-1 font-bold font-mono ${strikeColor}">${fmtMoney(strike)}</td>
-                        <td class="py-1.5 px-1 text-right font-mono text-gray-200 font-semibold">${fmtNum(oi)}</td>
-                        <td class="py-1.5 px-1 text-right font-mono text-orange-400/90">${fmtNum(vol)}</td>
-                    </tr>`;
+                        <tr class="hover:bg-zinc-800/40 transition-colors" style="${rowBg}">
+                            <td class="py-1.5 px-1.5 text-[11px] ${rankCls}">${String(idx + 1).padStart(2, '0')}</td>
+                            <td class="py-1.5 px-1.5 font-semibold ${strikeCls}">${fmtStrike(strike)}</td>
+                            <td class="py-1.5 px-1.5 text-right text-zinc-100 font-medium">${fmtNum(oi)}</td>
+                            <td class="py-1.5 px-1.5 text-right text-zinc-400">${fmtNum(vol)}</td>
+                        </tr>`;
+                }).join('');
+            };
+
+            // 수평 뎁스 바 및 고회전 강조가 적용된 Vol Top 10 렌더링
+            const renderVolTop10 = (mapVol, mapOi, elId, isCall) => {
+                const tbody = document.getElementById(elId);
+                const sorted = Object.entries(mapVol).filter(w => w[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
+                if (sorted.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-5 text-zinc-600 font-sans text-xs">당일 체결 없음</td></tr>`;
+                    return;
+                }
+                const maxVol = Math.max(...sorted.map(x => x[1]), 1);
+
+                tbody.innerHTML = sorted.map(([strikeStr, vol], idx) => {
+                    const strike = parseFloat(strikeStr);
+                    const oi = mapOi[strike] || 0;
+                    const ratio = oi > 0 ? (vol / oi) * 100 : null;
+                    const turnover = ratio !== null ? ratio.toFixed(0) + "%" : "NEW";
+                    const isHot = ratio === null || ratio >= 100;
+                    const pct = Math.min(100, Math.round((vol / maxVol) * 100));
+                    const rankCls = idx < 3 ? "text-zinc-200 font-semibold" : "text-zinc-500";
+                    const strikeCls = isCall ? "text-rose-400" : "text-emerald-400";
+                    const turnCls = isHot ? "text-zinc-100 font-semibold bg-zinc-800 px-1 py-0.2 rounded" : "text-zinc-400";
+                    const rowBg = `background: linear-gradient(to left, rgba(255, 255, 255, 0.055) ${pct}%, transparent ${pct}%);`;
+
+                    return `
+                        <tr class="hover:bg-zinc-800/40 transition-colors" style="${rowBg}">
+                            <td class="py-1.5 px-1.5 text-[11px] ${rankCls}">${String(idx + 1).padStart(2, '0')}</td>
+                            <td class="py-1.5 px-1.5 font-semibold ${strikeCls}">${fmtStrike(strike)}</td>
+                            <td class="py-1.5 px-1.5 text-right font-medium text-zinc-100">${fmtNum(vol)}</td>
+                            <td class="py-1.5 px-1.5 text-right text-zinc-500">${fmtNum(oi)}</td>
+                            <td class="py-1.5 px-1.5 text-right text-[11px]"><span class="${turnCls}">${turnover}</span></td>
+                        </tr>`;
                 }).join('');
             };
 
             renderOiTop10(sortedCalls, callVolMap, `${prefixId}-cwalls`, true);
             renderOiTop10(sortedPuts, putVolMap, `${prefixId}-pwalls`, false);
-
-            let renderVolTop10 = (mapVol, mapOi, elId, isCall) => {
-                let filtered = Object.entries(mapVol).filter(w => w[1] > 0);
-                let sorted = filtered.sort((a,b) => b[1] - a[1]).slice(0, 10);
-                if (sorted.length === 0) {
-                    document.getElementById(elId).innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500 text-xs">- 거래 없음 -</td></tr>`;
-                    return;
-                }
-
-                document.getElementById(elId).innerHTML = sorted.map(([strikeStr, vol], idx) => {
-                    let strike = parseFloat(strikeStr);
-                    let oi = mapOi[strike] || 0;
-                    let turnover = oi > 0 ? ((vol / oi) * 100).toFixed(0) + "%" : "신규";
-                    
-                    let rankBadge = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `<span class="text-gray-500 font-mono text-[11px]">${idx + 1}</span>`;
-                    let strikeColor = isCall ? "text-orange-300" : "text-amber-300";
-
-                    return `
-                    <tr class="hover:bg-white/5 transition-colors">
-                        <td class="py-1.5 px-1 text-center">${rankBadge}</td>
-                        <td class="py-1.5 px-1 font-bold font-mono ${strikeColor}">${fmtMoney(strike)}</td>
-                        <td class="py-1.5 px-1 text-right font-bold font-mono text-orange-400">${fmtNum(vol)}</td>
-                        <td class="py-1.5 px-1 text-right font-mono text-gray-400 text-xs">${fmtNum(oi)}</td>
-                        <td class="py-1.5 px-1 text-center font-mono text-[11px] text-cyan-400 font-semibold" title="24h 거래량 / OI 비중">${turnover}</td>
-                    </tr>`;
-                }).join('');
-            };
-
             renderVolTop10(callVolMap, callOiMap, `${prefixId}-cvol`, true);
             renderVolTop10(putVolMap, putOiMap, `${prefixId}-pvol`, false);
         }
 
-        connectWS();
-        pollBinancePerpREST();
+        // ================= 티커 전환 및 파라미터 제어 =================
+        function changeSymbol(sym, overrideDivYield = null) {
+            let cleaned = sym.trim().toUpperCase().replace(/^_/, '');
+            if (TICKER_TYPO_MAP[cleaned]) cleaned = TICKER_TYPO_MAP[cleaned];
+            if (!cleaned) return;
+
+            const isSwitchingTicker = (cleaned !== currentSymbol);
+            currentSymbol = cleaned;
+            document.getElementById('title-symbol').innerText = currentSymbol;
+            document.getElementById('inp-custom-sym').value = currentSymbol;
+
+            const savedEntry = quickWatchlist.find(x => x.sym === currentSymbol);
+            if (overrideDivYield !== null && !isNaN(overrideDivYield)) {
+                dividendYield = overrideDivYield;
+            } else if (savedEntry) {
+                dividendYield = savedEntry.q;
+            } else if (isSwitchingTicker) {
+                dividendYield = DEFAULT_DIV_MAP[currentSymbol] ?? 0.0;
+            }
+            document.getElementById('inp-div').value = (dividendYield * 100).toFixed(2);
+
+            renderQuickSymbolBar();
+            cboeSpotPrice = 0;
+            rawCboeChain = null;
+            latestMetrics = {};
+            clearBoardOnSymbolSwitch(currentSymbol);
+            updateSnapshotUI();
+            connectBinanceWS();
+            fetchCboeChain(true);
+        }
+
+        function applyCustomParams() {
+            let symVal = document.getElementById('inp-custom-sym').value.trim().toUpperCase().replace(/^_/, '');
+            if (TICKER_TYPO_MAP[symVal]) symVal = TICKER_TYPO_MAP[symVal];
+
+            const rVal = parseFloat(document.getElementById('inp-rate').value);
+            const qVal = parseFloat(document.getElementById('inp-div').value);
+            const refVal = document.getElementById('sel-price-ref').value;
+            const clkVal = document.getElementById('sel-clock-mode').value;
+            const dlrVal = document.getElementById('sel-dealer-mode').value;
+            const proxyVal = document.getElementById('inp-proxy').value.trim();
+
+            if (!isNaN(rVal)) riskFreeRate = rVal / 100.0;
+            priceRefMode = refVal;
+            clockMode = clkVal;
+            dealerMode = dlrVal;
+            customProxy = proxyVal;
+            localStorage.setItem("us_opt_custom_proxy", customProxy);
+            preferredProxyIdx = 0;
+
+            if (symVal && symVal !== currentSymbol) {
+                changeSymbol(symVal, null);
+            } else {
+                if (!isNaN(qVal)) {
+                    dividendYield = qVal / 100.0;
+                    if (quickWatchlist.some(x => x.sym === currentSymbol)) {
+                        upsertWatchlistSymbol(currentSymbol, dividendYield);
+                    }
+                }
+                if (rawCboeChain) {
+                    processFullChain(rawCboeChain);
+                } else {
+                    fetchCboeChain(true);
+                }
+            }
+        }
+
+        // ================= 초기 부팅 =================
+        function bootTerminal() {
+            if (customProxy) {
+                document.getElementById('inp-proxy').value = customProxy;
+            }
+            document.getElementById('title-symbol').innerText = currentSymbol;
+            document.getElementById('inp-custom-sym').value = currentSymbol;
+            document.getElementById('inp-div').value = (dividendYield * 100).toFixed(2);
+
+            initDOM();
+            renderQuickSymbolBar();
+            updateSnapshotUI();
+            connectBinanceWS();
+            fetchCboeChain(false);
+        }
+
+        bootTerminal();
     </script>
 </body>
 </html>
