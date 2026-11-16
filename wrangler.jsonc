@@ -1,7 +1,9 @@
 {
   "name": "chart",
-  "compatibility_date": "2026-10-21",
+  "compatibility_date": "2026-01-01",
+  "main": "worker.js",
   "assets": {
-    "directory": "."
+    "directory": "./public",
+    "binding": "ASSETS"
   }
 }
