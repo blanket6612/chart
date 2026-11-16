@@ -15,6 +15,7 @@
             --bg-elevated: #18181c;
             --border-subtle: #222228;
             --border-strong: #32323a;
+            --zero-gamma: #eab308;
         }
 
         body {
@@ -78,24 +79,24 @@
         .tier-tab-active {
             background-color: var(--bg-elevated) !important;
             border-color: var(--border-strong) !important;
-            border-top-color: #e4e4e7 !important;
+            border-top-color: #eab308 !important;
         }
 
-        /* 컨트롤 버튼 */
+        /* 컨트롤 버튼 (제로감마 노란색 적용) */
         .ctrl-btn {
             background-color: #16161a;
             border: 1px solid #27272f;
-            color: #d4d4d8;
+            color: #eab308;
             border-radius: 4px;
             font-size: 11px;
-            font-weight: 500;
+            font-weight: 600;
             padding: 5px 10px;
             transition: all 0.15s ease;
         }
         .ctrl-btn:hover {
             background-color: #222228;
-            border-color: #3f3f46;
-            color: #ffffff;
+            border-color: rgba(234, 179, 8, 0.5);
+            color: #facc15;
         }
 
         /* 시세 갱신 미세 하이라이트 */
@@ -124,22 +125,22 @@
                 <div class="flex flex-wrap items-center justify-between w-full xl:w-auto gap-3">
                     <div class="flex items-center gap-3 flex-wrap">
                         <div class="flex items-center gap-2">
-                            <span class="w-1 h-4 bg-zinc-200 rounded-sm inline-block"></span>
-                            <h1 class="text-base md:text-lg font-bold text-zinc-100 tracking-tight">
+                            <span class="w-1 h-4 bg-[#eab308] rounded-sm inline-block"></span>
+                            <h1 class="text-base md:text-lg font-bold text-[#eab308] tracking-tight">
                                 <span id="title-symbol" class="font-num">QQQ</span>
-                                <span class="font-medium text-zinc-400 text-sm ml-1">Options Microstructure</span>
+                                <span class="font-medium text-[#eab308]/85 text-sm ml-1">Options Microstructure</span>
                             </h1>
                         </div>
 
                         <!-- 동적 티커 바 -->
                         <div id="quick-sym-bar" class="flex items-center flex-wrap gap-0.5 bg-zinc-950 border border-zinc-800 rounded p-0.5 text-xs font-num"></div>
 
-                        <span id="cadence-badge" class="px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-800">만기주기 확인중</span>
+                        <span id="cadence-badge" class="px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 text-[#eab308] border border-zinc-800">만기주기 확인중</span>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-1.5">
                         <button onclick="saveSnapshot()" class="ctrl-btn flex items-center gap-1.5" title="현재 시점 지표를 브라우저에 기록해 실시간 증감량(Δ)을 추적합니다">
-                            <span class="w-1.5 h-1.5 rounded-full bg-zinc-400 inline-block"></span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#eab308] inline-block"></span>
                             <span id="btn-snap-text">스냅샷 고정</span>
                         </button>
                         <button onclick="clearSnapshot()" id="btn-snap-clear" class="hidden ctrl-btn hover:!text-rose-400 hover:!border-rose-500/40" title="스냅샷 초기화">
@@ -214,21 +215,21 @@
                     <div>
                         <label class="block text-[11px] text-zinc-400 mb-1">티커 조회 (성공 시 상단 추가)</label>
                         <div class="flex gap-1">
-                            <input id="inp-custom-sym" type="text" value="QQQ" onkeydown="if(event.key==='Enter') applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-100 uppercase">
-                            <button onclick="applyCustomParams()" class="px-2.5 py-1 bg-zinc-200 hover:bg-white text-zinc-950 font-semibold rounded shrink-0 transition-colors">적용</button>
+                            <input id="inp-custom-sym" type="text" value="QQQ" onkeydown="if(event.key==='Enter') applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-[#eab308] outline-none rounded px-2 py-1 font-num text-zinc-100 uppercase">
+                            <button onclick="applyCustomParams()" class="px-2.5 py-1 bg-[#eab308] hover:bg-yellow-400 text-zinc-950 font-semibold rounded shrink-0 transition-colors">적용</button>
                         </div>
                     </div>
                     <div>
                         <label class="block text-[11px] text-zinc-400 mb-1">상단 티커 편집 (쉼표 구분)</label>
-                        <input id="inp-watchlist" type="text" value="QQQ, NVDA, ADBE" onchange="syncWatchlistFromInput()" onkeydown="if(event.key==='Enter') syncWatchlistFromInput()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-200 uppercase">
+                        <input id="inp-watchlist" type="text" value="QQQ, NVDA, ADBE" onchange="syncWatchlistFromInput()" onkeydown="if(event.key==='Enter') syncWatchlistFromInput()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-[#eab308] outline-none rounded px-2 py-1 font-num text-zinc-200 uppercase">
                     </div>
                     <div>
                         <label class="block text-[11px] text-zinc-400 mb-1">무위험 금리 r (연 %)</label>
-                        <input id="inp-rate" type="number" step="0.01" value="4.32" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-100">
+                        <input id="inp-rate" type="number" step="0.01" value="4.32" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-[#eab308] outline-none rounded px-2 py-1 font-num text-zinc-100">
                     </div>
                     <div>
                         <label class="block text-[11px] text-zinc-400 mb-1">배당수익률 q (연 %)</label>
-                        <input id="inp-div" type="number" step="0.01" value="0.45" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-100">
+                        <input id="inp-div" type="number" step="0.01" value="0.45" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-[#eab308] outline-none rounded px-2 py-1 font-num text-zinc-100">
                     </div>
                     <div>
                         <label class="block text-[11px] text-zinc-400 mb-1">기초자산(S) 기준</label>
@@ -253,7 +254,7 @@
                     </div>
                     <div>
                         <label class="block text-[11px] text-zinc-400 mb-1">커스텀 CORS 프록시</label>
-                        <input id="inp-proxy" type="text" placeholder="/proxy?url=" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 outline-none rounded px-2 py-1 font-num text-zinc-300">
+                        <input id="inp-proxy" type="text" placeholder="/proxy?url=" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-[#eab308] outline-none rounded px-2 py-1 font-num text-zinc-300">
                     </div>
                 </div>
             </div>
@@ -266,7 +267,7 @@
         <!-- 1.5 만기별 핵심 레벨 통합 비교 테이블 -->
         <section class="panel p-3.5">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2.5 gap-1">
-                <div class="text-xs font-semibold text-zinc-200 tracking-tight flex items-center gap-2">
+                <div class="text-xs font-bold text-[#eab308] tracking-tight flex items-center gap-2">
                     <span>4-TIER CROSS-EXPIRY SUMMARY</span>
                     <span class="text-[11px] font-normal text-zinc-500">승수 ×100 반영</span>
                 </div>
@@ -279,7 +280,7 @@
                     <thead>
                         <tr class="text-[11px] text-zinc-500 border-b border-zinc-800 uppercase tracking-wider">
                             <th class="py-1.5 px-2 font-medium">만기 구분</th>
-                            <th class="py-1.5 px-2 font-medium text-amber-400/90">Zero Γ (플립)</th>
+                            <th class="py-1.5 px-2 font-medium text-[#eab308]">Zero Γ (플립)</th>
                             <th class="py-1.5 px-2 font-medium">Zero Δ (수렴)</th>
                             <th class="py-1.5 px-2 font-medium">Max Pain</th>
                             <th class="py-1.5 px-2 font-medium">Net Γ ($ GEX)</th>
@@ -304,32 +305,32 @@
         <nav class="grid grid-cols-2 md:grid-cols-4 gap-2">
             <button onclick="switchTab('0dte')" id="btn-tab-0dte" class="tier-tab py-2.5 px-3.5 text-left tier-tab-active">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-zinc-100" id="tab-title-0dte">최근접물 (0DTE)</span>
-                    <span class="text-[10px] font-num text-zinc-500">T1</span>
+                    <span class="text-xs font-bold text-[#eab308]" id="tab-title-0dte">최근접물 (0DTE)</span>
+                    <span class="text-[10px] font-num text-[#eab308]/80">T1</span>
                 </div>
                 <div class="text-[11px] text-zinc-400 font-num mt-0.5" id="tab-sub-0dte">탐색중...</div>
             </button>
 
             <button onclick="switchTab('1dte')" id="btn-tab-1dte" class="tier-tab py-2.5 px-3.5 text-left opacity-75">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-zinc-200" id="tab-title-1dte">차근접물 (1DTE)</span>
-                    <span class="text-[10px] font-num text-zinc-500">T2</span>
+                    <span class="text-xs font-bold text-[#eab308]" id="tab-title-1dte">차근접물 (1DTE)</span>
+                    <span class="text-[10px] font-num text-[#eab308]/80">T2</span>
                 </div>
                 <div class="text-[11px] text-zinc-400 font-num mt-0.5" id="tab-sub-1dte">탐색중...</div>
             </button>
 
             <button onclick="switchTab('monthly')" id="btn-tab-monthly" class="tier-tab py-2.5 px-3.5 text-left opacity-75">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-zinc-200" id="tab-title-monthly">당월물 (Monthly)</span>
-                    <span class="text-[10px] font-num text-zinc-500">T3</span>
+                    <span class="text-xs font-bold text-[#eab308]" id="tab-title-monthly">당월물 (Monthly)</span>
+                    <span class="text-[10px] font-num text-[#eab308]/80">T3</span>
                 </div>
                 <div class="text-[11px] text-zinc-400 font-num mt-0.5" id="tab-sub-monthly">탐색중...</div>
             </button>
 
             <button onclick="switchTab('nextmonth')" id="btn-tab-nextmonth" class="tier-tab py-2.5 px-3.5 text-left opacity-75">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-zinc-200" id="tab-title-nextmonth">차월물 (Next Monthly)</span>
-                    <span class="text-[10px] font-num text-zinc-500">T4</span>
+                    <span class="text-xs font-bold text-[#eab308]" id="tab-title-nextmonth">차월물 (Next Monthly)</span>
+                    <span class="text-[10px] font-num text-[#eab308]/80">T4</span>
                 </div>
                 <div class="text-[11px] text-zinc-400 font-num mt-0.5" id="tab-sub-nextmonth">탐색중...</div>
             </button>
@@ -341,13 +342,13 @@
         <!-- 4. 하단 미시구조 레퍼런스 가이드 -->
         <footer class="panel p-5">
             <div class="flex flex-wrap items-center justify-between pb-3 mb-4 border-b border-zinc-800/80 gap-2">
-                <h3 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Microstructure Reference Guide</h3>
+                <h3 class="text-xs font-bold text-[#eab308] uppercase tracking-wider">Microstructure Reference Guide</h3>
                 <span class="text-[11px] text-zinc-500">BSM 배당·금리 보정 · 세션 시계 동기화 · 옵션 승수(×100주) 적용</span>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs leading-relaxed">
                 <div class="space-y-2">
-                    <div class="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider pb-1 border-b border-zinc-800/60">
+                    <div class="text-[11px] font-semibold text-[#eab308]/90 uppercase tracking-wider pb-1 border-b border-zinc-800/60">
                         01. 정산 OI 및 장중 회전율 해석
                     </div>
                     <ul class="space-y-1.5 text-zinc-400">
@@ -358,7 +359,7 @@
                 </div>
 
                 <div class="space-y-2">
-                    <div class="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider pb-1 border-b border-zinc-800/60">
+                    <div class="text-[11px] font-semibold text-[#eab308]/90 uppercase tracking-wider pb-1 border-b border-zinc-800/60">
                         02. 핵심 감마·델타 변곡점
                     </div>
                     <ul class="space-y-1.5 text-zinc-400">
@@ -369,7 +370,7 @@
                 </div>
 
                 <div class="space-y-2">
-                    <div class="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider pb-1 border-b border-zinc-800/60">
+                    <div class="text-[11px] font-semibold text-[#eab308]/90 uppercase tracking-wider pb-1 border-b border-zinc-800/60">
                         03. 세션 시계 및 2차 교차 그릭스
                     </div>
                     <ul class="space-y-1.5 text-zinc-400">
@@ -423,7 +424,6 @@
 
         function loadInitialProxy() {
             const saved = localStorage.getItem("us_opt_custom_proxy");
-            // 클라우드플레어 배포 도메인에서 예전 로컬(127.0.0.1) 주소가 남아있으면 자동으로 /proxy?url= 전환
             if (saved && saved.includes("127.0.0.1") && location.hostname !== "127.0.0.1" && location.hostname !== "localhost" && location.protocol !== "file:") {
                 return "/proxy?url=";
             }
@@ -453,7 +453,7 @@
         let nextPollAt = 0;
         let preferredProxyIdx = 0;
 
-        // ================= 동적 상단 티커 바 관리 =================
+        // ================= 동적 상단 티커 바 관리 (제로감마 노란색 적용) =================
         function saveWatchlist() {
             try { localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(quickWatchlist)); } catch (e) {}
             const wlInput = document.getElementById('inp-watchlist');
@@ -467,10 +467,10 @@
             bar.innerHTML = quickWatchlist.map(item => {
                 const isActive = (item.sym === currentSymbol);
                 const btnCls = isActive
-                    ? "bg-zinc-200 text-zinc-950 font-semibold"
-                    : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/70";
+                    ? "bg-[#eab308] text-zinc-950 font-bold"
+                    : "text-[#eab308]/85 hover:text-[#eab308] hover:bg-zinc-800/70 font-medium";
                 const delBtn = quickWatchlist.length > 1
-                    ? `<span onclick="removeQuickSymbol(event, '${item.sym}')" class="ml-1.5 text-[10px] opacity-50 hover:opacity-100 hover:text-rose-500 cursor-pointer" title="${item.sym} 제거">×</span>`
+                    ? `<span onclick="removeQuickSymbol(event, '${item.sym}')" class="ml-1.5 text-[10px] opacity-60 hover:opacity-100 hover:text-rose-500 cursor-pointer" title="${item.sym} 제거">×</span>`
                     : "";
                 return `<button onclick="changeSymbol('${item.sym}')" class="px-2 py-0.5 rounded-sm flex items-center transition-colors ${btnCls}">
                     <span>${item.sym}</span>${delBtn}
@@ -855,9 +855,9 @@
                 if (dow === 1 || dow === 3) hasMonWed = true;
             });
 
-            if (hasTueThu) return { type: 'daily', badge: '주 5일 데일리', style: 'bg-zinc-900 text-zinc-300 border-zinc-700' };
-            if (hasMonWed) return { type: 'triweekly', badge: '월·수·금 위클리', style: 'bg-zinc-900 text-zinc-300 border-zinc-700' };
-            return { type: 'weekly', badge: '금요일 위클리', style: 'bg-zinc-900 text-zinc-300 border-zinc-700' };
+            if (hasTueThu) return { type: 'daily', badge: '주 5일 데일리', style: 'bg-zinc-900 text-[#eab308] border-zinc-700' };
+            if (hasMonWed) return { type: 'triweekly', badge: '월·수·금 위클리', style: 'bg-zinc-900 text-[#eab308] border-zinc-700' };
+            return { type: 'weekly', badge: '금요일 위클리', style: 'bg-zinc-900 text-[#eab308] border-zinc-700' };
         }
 
         function selectFourTiers(expMap, clockState) {
@@ -913,7 +913,6 @@
                 expNM = fallbackAfterM.length > 0 ? fallbackAfterM[0] : expM;
             }
 
-            // 정기 월물과 단기 슬롯이 겹칠 때 '당월물' 명칭을 최우선으로 노출하도록 개선
             const buildSlot0Label = (e) => {
                 if (e.isMonthly) {
                     if (e.dte === 0) return `당월물 · 0DTE (${e.mm}월 OpEx)`;
@@ -984,8 +983,8 @@
                     <div class="panel p-4 md:p-5">
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center pb-3.5 mb-4 border-b border-zinc-800/80 gap-2.5">
                             <div class="flex items-center gap-2.5 flex-wrap">
-                                <span class="text-[11px] font-num font-semibold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">${t.code}</span>
-                                <h2 class="text-sm md:text-base font-bold text-zinc-100 tracking-tight" id="${t.id}-panel-title">${t.name} 미시구조 지표군</h2>
+                                <span class="text-[11px] font-num font-semibold px-1.5 py-0.5 rounded bg-zinc-800 text-[#eab308]">${t.code}</span>
+                                <h2 class="text-sm md:text-base font-bold text-[#eab308] tracking-tight" id="${t.id}-panel-title">${t.name} 미시구조 지표군</h2>
                                 <span id="${t.id}-expiry-badge" class="text-xs text-zinc-400 font-num bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">만기 로드중...</span>
                             </div>
                             <div id="${t.id}-regime-banner" class="w-full md:w-auto px-3 py-1 rounded border text-xs font-medium flex items-center justify-between gap-3 bg-zinc-900 border-zinc-800 text-zinc-400">
@@ -1005,7 +1004,7 @@
                             </div>
 
                             <div class="metric-cell p-3 border-amber-500/20">
-                                <div class="text-[11px] text-amber-400/90 font-medium mb-1 flex items-center justify-between">
+                                <div class="text-[11px] text-[#eab308] font-medium mb-1 flex items-center justify-between">
                                     <span>Zero Γ (플립선)</span>
                                     <span id="${t.id}-diff-zerogamma" class="text-[10px] font-num"></span>
                                 </div>
@@ -1096,7 +1095,7 @@
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div class="panel p-4">
                             <div class="flex flex-wrap justify-between items-center pb-2.5 mb-3 border-b border-zinc-800/80 gap-2">
-                                <h3 class="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Open Interest Walls (Top 10)</h3>
+                                <h3 class="text-xs font-bold text-[#eab308] uppercase tracking-wider">Open Interest Walls (Top 10)</h3>
                                 <div id="${t.id}-oi-lag-notice" class="text-[11px] text-zinc-500">
                                     OCC 정산 누적 미결제약정 순 (단위: 계약)
                                 </div>
@@ -1147,7 +1146,7 @@
 
                         <div class="panel p-4">
                             <div class="flex justify-between items-center pb-2.5 mb-3 border-b border-zinc-800/80">
-                                <h3 class="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Intraday Active Volume (Top 10)</h3>
+                                <h3 class="text-xs font-bold text-[#eab308] uppercase tracking-wider">Intraday Active Volume (Top 10)</h3>
                                 <div class="text-[11px] text-zinc-500">정규장 실체결 및 회전율 상위</div>
                             </div>
 
@@ -1210,7 +1209,7 @@
             const cadEl = document.getElementById('cadence-badge');
             if (cadEl) {
                 cadEl.innerText = "만기주기 확인중";
-                cadEl.className = "px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-800";
+                cadEl.className = "px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 text-[#eab308] border border-zinc-800";
             }
 
             tiers.forEach((t, idx) => {
