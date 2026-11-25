@@ -156,6 +156,12 @@
                             JSON 로드
                             <input type="file" accept=".json" class="hidden" onchange="handleLocalJsonFile(event)">
                         </label>
+                        <button onclick="exportFourTierCSV()" id="btn-csv-export" class="ctrl-btn" title="4계층 그릭스 및 스트라이크별 OI·거래량·회전율 CSV 파일 다운로드">
+                            CSV 저장
+                        </button>
+                        <button onclick="copyFourTierCSV()" id="btn-csv-copy" class="ctrl-btn" title="4계층 전체 CSV 데이터를 클립보드에 복사">
+                            CSV 복사
+                        </button>
                     </div>
                 </div>
 
@@ -211,7 +217,7 @@
 
             <!-- 접이식 파라미터 설정 바 -->
             <div id="config-bar" class="hidden panel p-3 bg-zinc-950/95 text-xs">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-2.5 items-end">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-9 gap-2.5 items-end">
                     <div>
                         <label class="block text-[11px] text-zinc-400 mb-1">티커 조회 (성공 시 상단 추가)</label>
                         <div class="flex gap-1">
@@ -255,6 +261,14 @@
                     <div>
                         <label class="block text-[11px] text-zinc-400 mb-1">커스텀 CORS 프록시</label>
                         <input id="inp-proxy" type="text" placeholder="/proxy?url=" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 focus:border-[#eab308] outline-none rounded px-2 py-1 font-num text-zinc-300">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">CSV 스트라이크 범위</label>
+                        <select id="sel-csv-scope" onchange="applyCustomParams()" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-zinc-200 outline-none">
+                            <option value="all">전체 활성 (OI/Vol &gt; 0)</option>
+                            <option value="focus">핵심 구간 (Top 20 + ±15%)</option>
+                            <option value="top10">화면 Top 10 합집합</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -439,12 +453,15 @@
         let clockMode = "session";
         let dealerMode = "index";
         let customProxy = loadInitialProxy();
+        let csvExportScope = localStorage.getItem("us_opt_csv_scope") || "all";
 
         let cboeSpotPrice = 0;
         let perpPrice = 0;
+        let perpFundingRate = null;
         let currentAtmIv30 = 0;
         let rawCboeChain = null;
         let latestMetrics = {};
+        let latestExportState = null;
 
         let binanceWs = null;
         let binanceRestTimer = null;
@@ -1384,6 +1401,7 @@
                 updateBasisDisplay();
             }
             if (fundingRate !== null && fundingRate !== undefined && !isNaN(fundingRate)) {
+                perpFundingRate = fundingRate;
                 const fundEl = document.getElementById('val-funding');
                 if (fundEl) {
                     const pct = (fundingRate * 100).toFixed(4);
@@ -1420,6 +1438,7 @@
             if (binanceRestTimer) clearInterval(binanceRestTimer);
 
             perpPrice = 0;
+            perpFundingRate = null;
             const pairLower = `${currentSymbol.toLowerCase()}usdt`;
             document.getElementById('perp-source-label').innerText = `${currentSymbol}USDT PERP`;
             document.getElementById('val-perp').innerText = "--";
@@ -1707,6 +1726,20 @@
             document.getElementById('nextmonth-expiry-badge').innerText = `${selected.expNM.expStr} · ${selected.expNM.desc}`;
 
             latestMetrics = {};
+            latestExportState = {
+                capturedAt: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }),
+                symbol: currentSymbol,
+                cadence: selected.cadenceInfo.badge,
+                sessionMode: clockState.badgeText,
+                priceRefMode,
+                dealerMode,
+                riskFreeRate,
+                dividendYield,
+                cboeSpotPrice,
+                effectiveSpot: spotRef,
+                atmIv30: currentAtmIv30,
+                tiers: []
+            };
             runQuantEngine(parsedOptions, selected.exp0, spotRef, clockState, "0dte", l0);
             runQuantEngine(parsedOptions, selected.exp1, spotRef, clockState, "1dte", l1);
             runQuantEngine(parsedOptions, selected.expM, spotRef, clockState, "monthly", lM);
@@ -1722,15 +1755,19 @@
             const strikes = new Set();
             const callOiMap = {}, putOiMap = {};
             const callVolMap = {}, putVolMap = {};
+            const callIvMap = {}, putIvMap = {};
+            const strikeGexMap = {};
 
             options.forEach(opt => {
                 strikes.add(opt.strike);
                 if (opt.isCall) {
                     callOiMap[opt.strike] = (callOiMap[opt.strike] || 0) + opt.oi;
                     callVolMap[opt.strike] = (callVolMap[opt.strike] || 0) + opt.vol;
+                    if (opt.iv > 0) callIvMap[opt.strike] = opt.iv;
                 } else {
                     putOiMap[opt.strike] = (putOiMap[opt.strike] || 0) + opt.oi;
                     putVolMap[opt.strike] = (putVolMap[opt.strike] || 0) + opt.vol;
+                    if (opt.iv > 0) putIvMap[opt.strike] = opt.iv;
                 }
             });
 
@@ -1780,8 +1817,11 @@
                 const contractsShares = opt.oi * CONTRACT_MULTIPLIER;
                 const dealerMult = getDealerMultiplier(opt.isCall);
 
+                const optGex = (g.gamma * spotRef * spotRef * 0.01) * contractsShares * dealerMult;
+                strikeGexMap[opt.strike] = (strikeGexMap[opt.strike] || 0) + optGex;
+
                 netD += g.delta * contractsShares;
-                netG += (g.gamma * spotRef * spotRef * 0.01) * contractsShares * dealerMult;
+                netG += optGex;
                 netTheta += g.theta * contractsShares;
                 netVega += g.vega * contractsShares;
                 netVanna += g.vanna * contractsShares * dealerMult;
@@ -2001,6 +2041,269 @@
             renderOiTop10(sortedPuts, putVolMap, `${prefixId}-pwalls`, false);
             renderVolTop10(callVolMap, callOiMap, `${prefixId}-cvol`, true);
             renderVolTop10(putVolMap, putOiMap, `${prefixId}-pvol`, false);
+
+            // CSV 출력용 4계층 개별 그릭스 및 전체 스트라이크 데이터 수집
+            if (latestExportState) {
+                const tierCodeMap = { "0dte": "T1", "1dte": "T2", "monthly": "T3", "nextmonth": "T4" };
+                const buildRankMap = (valMap) => {
+                    const rankMap = {};
+                    Object.entries(valMap)
+                        .filter(x => x[1] > 0)
+                        .sort((a, b) => b[1] - a[1])
+                        .forEach(([k], idx) => { rankMap[parseFloat(k)] = idx + 1; });
+                    return rankMap;
+                };
+
+                const callOiRankMap = buildRankMap(callOiMap);
+                const putOiRankMap = buildRankMap(putOiMap);
+                const callVolRankMap = buildRankMap(callVolMap);
+                const putVolRankMap = buildRankMap(putVolMap);
+
+                const strikeRows = Array.from(strikes)
+                    .sort((a, b) => a - b)
+                    .map(strike => {
+                        const cOi = callOiMap[strike] || 0;
+                        const cVol = callVolMap[strike] || 0;
+                        const pOi = putOiMap[strike] || 0;
+                        const pVol = putVolMap[strike] || 0;
+                        if (cOi <= 0 && cVol <= 0 && pOi <= 0 && pVol <= 0) return null;
+
+                        const calcTurn = (vol, oi) => {
+                            if (vol <= 0) return 0;
+                            if (oi <= 0) return "NEW";
+                            return Number(((vol / oi) * 100).toFixed(1));
+                        };
+
+                        return {
+                            strike,
+                            distSpotPct: Number((((strike - spotRef) / spotRef) * 100).toFixed(2)),
+                            callOi: cOi,
+                            callVol: cVol,
+                            callTurnPct: calcTurn(cVol, cOi),
+                            callIvPct: callIvMap[strike] ? Number((callIvMap[strike] * 100).toFixed(2)) : "",
+                            callOiRank: callOiRankMap[strike] || "",
+                            callVolRank: callVolRankMap[strike] || "",
+                            putOi: pOi,
+                            putVol: pVol,
+                            putTurnPct: calcTurn(pVol, pOi),
+                            putIvPct: putIvMap[strike] ? Number((putIvMap[strike] * 100).toFixed(2)) : "",
+                            putOiRank: putOiRankMap[strike] || "",
+                            putVolRank: putVolRankMap[strike] || "",
+                            strikeNetGexUsd: Math.round(strikeGexMap[strike] || 0)
+                        };
+                    })
+                    .filter(Boolean);
+
+                latestExportState.tiers.push({
+                    tierCode: tierCodeMap[prefixId] || prefixId,
+                    tierId: prefixId,
+                    tierLabel,
+                    expiry: expInfo.expStr,
+                    dte: expInfo.dte,
+                    regime: netG >= 0 ? "POSITIVE_GAMMA" : "NEGATIVE_GAMMA",
+                    preSettlementLag: isPreSettlementLag,
+                    zeroGamma: zeroGammaPrice > 0 ? Number(zeroGammaPrice.toFixed(2)) : "",
+                    zeroDelta: zeroDeltaPrice > 0 ? Number(zeroDeltaPrice.toFixed(2)) : "",
+                    maxPain: maxPainStrike,
+                    netGexUsd: Math.round(netG),
+                    netDeltaShares: Math.round(netD),
+                    netDeltaUsd: Math.round(netD * spotRef),
+                    skew25dPctP: Number(skew.toFixed(2)),
+                    pcrOi: Number(pcr.toFixed(4)),
+                    pcrVol: Number(volPcr.toFixed(4)),
+                    totalCallOi,
+                    totalPutOi,
+                    totalCallVol,
+                    totalPutVol,
+                    netVegaUsd: Math.round(netVega),
+                    netThetaUsd: Math.round(netTheta),
+                    netVannaShares: Math.round(netVanna),
+                    netCharmShares: Math.round(netCharm),
+                    top1PWallStrike: sortedPuts.length > 0 ? parseFloat(sortedPuts[0][0]) : "",
+                    top1PWallOi: sortedPuts.length > 0 ? sortedPuts[0][1] : "",
+                    top1CWallStrike: sortedCalls.length > 0 ? parseFloat(sortedCalls[0][0]) : "",
+                    top1CWallOi: sortedCalls.length > 0 ? sortedCalls[0][1] : "",
+                    strikes: strikeRows
+                });
+            }
+        }
+
+        // ================= 4계층 CSV 생성 · 다운로드 · 클립보드 복사 =================
+        function csvEscape(val) {
+            if (val === null || val === undefined) return "";
+            const str = String(val);
+            if (/[",
+]/.test(str)) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        }
+
+        function filterStrikesByScope(strikeRows, scope) {
+            if (scope === "top10") {
+                return strikeRows.filter(r =>
+                    (r.callOiRank && r.callOiRank <= 10) ||
+                    (r.putOiRank && r.putOiRank <= 10) ||
+                    (r.callVolRank && r.callVolRank <= 10) ||
+                    (r.putVolRank && r.putVolRank <= 10)
+                );
+            }
+            if (scope === "focus") {
+                return strikeRows.filter(r =>
+                    Math.abs(r.distSpotPct) <= 15 ||
+                    (r.callOiRank && r.callOiRank <= 20) ||
+                    (r.putOiRank && r.putOiRank <= 20) ||
+                    (r.callVolRank && r.callVolRank <= 20) ||
+                    (r.putVolRank && r.putVolRank <= 20)
+                );
+            }
+            return strikeRows;
+        }
+
+        function buildFourTierCsvContent() {
+            if (!latestExportState || !latestExportState.tiers || latestExportState.tiers.length === 0) {
+                return null;
+            }
+
+            const st = latestExportState;
+            const livePerp = perpPrice > 0 ? Number(perpPrice.toFixed(2)) : "";
+            const liveBasis = (st.cboeSpotPrice > 0 && perpPrice > 0)
+                ? Number((perpPrice - st.cboeSpotPrice).toFixed(4))
+                : "";
+            const liveFundingPct = (perpFundingRate !== null && !isNaN(perpFundingRate))
+                ? Number((perpFundingRate * 100).toFixed(4))
+                : "";
+
+            const rows = [];
+
+            // Section 1: META
+            rows.push(["[META]"]);
+            rows.push([
+                "Captured_At_KST", "Symbol", "Cadence", "Session_Mode", "Price_Ref_Mode", "Dealer_Model",
+                "CSV_Scope", "RiskFree_Rate_Pct", "Dividend_Yield_Pct", "Cboe_Spot", "Effective_Spot",
+                "Binance_Perp", "Basis_USD", "Funding_Rate_Pct", "ATM_IV_30D_Pct"
+            ]);
+            rows.push([
+                st.capturedAt,
+                st.symbol,
+                st.cadence,
+                st.sessionMode,
+                st.priceRefMode,
+                st.dealerMode,
+                csvExportScope,
+                Number((st.riskFreeRate * 100).toFixed(2)),
+                Number((st.dividendYield * 100).toFixed(2)),
+                st.cboeSpotPrice > 0 ? Number(st.cboeSpotPrice.toFixed(2)) : "",
+                st.effectiveSpot > 0 ? Number(st.effectiveSpot.toFixed(2)) : "",
+                livePerp,
+                liveBasis,
+                liveFundingPct,
+                st.atmIv30 > 0 ? Number(st.atmIv30.toFixed(2)) : ""
+            ]);
+            rows.push([]);
+
+            // Section 2: 4-TIER GREEKS
+            rows.push(["[4-TIER_GREEKS]"]);
+            rows.push([
+                "Tier_Code", "Tier_Label", "Expiry", "DTE", "Regime", "Pre_Settlement_Lag",
+                "Zero_Gamma", "Zero_Delta", "Max_Pain", "Net_GEX_USD", "Net_Delta_Shares", "Net_Delta_USD",
+                "Skew_25D_PctP", "PCR_OI", "PCR_Vol", "Total_Call_OI", "Total_Put_OI", "Total_Call_Vol", "Total_Put_Vol",
+                "Net_Vega_USD_Per_1Pct", "Net_Theta_USD_Per_Day", "Net_Vanna_Shares_Per_1Pct", "Net_Charm_Shares_Per_Day",
+                "Top1_PWall_Strike", "Top1_PWall_OI", "Top1_CWall_Strike", "Top1_CWall_OI"
+            ]);
+            st.tiers.forEach(t => {
+                rows.push([
+                    t.tierCode, t.tierLabel, t.expiry, t.dte, t.regime, t.preSettlementLag ? "YES" : "NO",
+                    t.zeroGamma, t.zeroDelta, t.maxPain, t.netGexUsd, t.netDeltaShares, t.netDeltaUsd,
+                    t.skew25dPctP, t.pcrOi, t.pcrVol, t.totalCallOi, t.totalPutOi, t.totalCallVol, t.totalPutVol,
+                    t.netVegaUsd, t.netThetaUsd, t.netVannaShares, t.netCharmShares,
+                    t.top1PWallStrike, t.top1PWallOi, t.top1CWallStrike, t.top1CWallOi
+                ]);
+            });
+            rows.push([]);
+
+            // Section 3: STRIKE-LEVEL OI / VOLUME / TURNOVER / GEX
+            rows.push(["[STRIKE_DATA]"]);
+            rows.push([
+                "Tier_Code", "Expiry", "Strike", "Dist_Spot_Pct",
+                "Call_OI", "Call_Vol", "Call_Turn_Pct", "Call_IV_Pct", "Call_OI_Rank", "Call_Vol_Rank",
+                "Put_OI", "Put_Vol", "Put_Turn_Pct", "Put_IV_Pct", "Put_OI_Rank", "Put_Vol_Rank",
+                "Strike_Net_GEX_USD"
+            ]);
+            st.tiers.forEach(t => {
+                const filtered = filterStrikesByScope(t.strikes, csvExportScope);
+                filtered.forEach(r => {
+                    rows.push([
+                        t.tierCode, t.expiry, r.strike, r.distSpotPct,
+                        r.callOi, r.callVol, r.callTurnPct, r.callIvPct, r.callOiRank, r.callVolRank,
+                        r.putOi, r.putVol, r.putTurnPct, r.putIvPct, r.putOiRank, r.putVolRank,
+                        r.strikeNetGexUsd
+                    ]);
+                });
+            });
+
+            return rows.map(row => row.map(csvEscape).join(",")).join("\r\n");
+        }
+
+        function flashActionButton(btnId, tempText) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            const orig = btn.dataset.origText || btn.innerText;
+            btn.dataset.origText = orig;
+            btn.innerText = tempText;
+            clearTimeout(btn._flashTimer);
+            btn._flashTimer = setTimeout(() => {
+                btn.innerText = orig;
+            }, 1600);
+        }
+
+        function exportFourTierCSV() {
+            const csvBody = buildFourTierCsvContent();
+            if (!csvBody) {
+                alert("출력할 옵션 데이터가 아직 로드되지 않았습니다.");
+                return;
+            }
+            const bomCsv = "\uFEFF" + csvBody;
+            const blob = new Blob([bomCsv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${latestExportState.symbol}_options_4tier_${stamp}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            flashActionButton("btn-csv-export", "저장 완료");
+        }
+
+        async function copyFourTierCSV() {
+            const csvBody = buildFourTierCsvContent();
+            if (!csvBody) {
+                alert("복사할 옵션 데이터가 아직 로드되지 않았습니다.");
+                return;
+            }
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(csvBody);
+                } else {
+                    const ta = document.createElement("textarea");
+                    ta.value = csvBody;
+                    ta.style.position = "fixed";
+                    ta.style.opacity = "0";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                }
+                flashActionButton("btn-csv-copy", "복사됨 ✓");
+            } catch (err) {
+                alert("클립보드 복사에 실패했습니다. CSV 저장 버튼을 이용해 주세요.");
+            }
         }
 
         // ================= 티커 전환 및 파라미터 제어 =================
@@ -2028,6 +2331,7 @@
             cboeSpotPrice = 0;
             rawCboeChain = null;
             latestMetrics = {};
+            latestExportState = null;
             clearBoardOnSymbolSwitch(currentSymbol);
             updateSnapshotUI();
             connectBinanceWS();
@@ -2044,13 +2348,16 @@
             const clkVal = document.getElementById('sel-clock-mode').value;
             const dlrVal = document.getElementById('sel-dealer-mode').value;
             const proxyVal = document.getElementById('inp-proxy').value.trim();
+            const csvScopeVal = document.getElementById('sel-csv-scope').value;
 
             if (!isNaN(rVal)) riskFreeRate = rVal / 100.0;
             priceRefMode = refVal;
             clockMode = clkVal;
             dealerMode = dlrVal;
             customProxy = proxyVal || "/proxy?url=";
+            csvExportScope = csvScopeVal || "all";
             localStorage.setItem("us_opt_custom_proxy", customProxy);
+            localStorage.setItem("us_opt_csv_scope", csvExportScope);
             preferredProxyIdx = 0;
 
             if (symVal && symVal !== currentSymbol) {
@@ -2073,6 +2380,7 @@
         // ================= 초기 부팅 =================
         function bootTerminal() {
             document.getElementById('inp-proxy').value = customProxy;
+            document.getElementById('sel-csv-scope').value = csvExportScope;
             document.getElementById('title-symbol').innerText = currentSymbol;
             document.getElementById('inp-custom-sym').value = currentSymbol;
             document.getElementById('inp-div').value = (dividendYield * 100).toFixed(2);
