@@ -2132,8 +2132,7 @@
         function csvEscape(val) {
             if (val === null || val === undefined) return "";
             const str = String(val);
-            if (/[",
-]/.test(str)) {
+            if (/[",\r\n]/.test(str)) {
                 return `"${str.replace(/"/g, '""')}"`;
             }
             return str;
