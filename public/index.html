@@ -152,10 +152,6 @@
                         <button onclick="toggleConfigBar()" class="ctrl-btn" title="파라미터 및 프록시 설정">
                             설정
                         </button>
-                        <label class="ctrl-btn cursor-pointer" title="로컬 Cboe JSON 파일 직접 불러오기">
-                            JSON 로드
-                            <input type="file" accept=".json" class="hidden" onchange="handleLocalJsonFile(event)">
-                        </label>
                         <button onclick="exportFourTierCSV()" id="btn-csv-export" class="ctrl-btn" title="4계층 그릭스 및 스트라이크별 OI·거래량·회전율 CSV 파일 다운로드">
                             CSV 저장
                         </button>
@@ -1547,36 +1543,6 @@
                     setFeedStatus('err', 'CORS 차단 (설정 확인)');
                 }
             }
-        }
-
-        function handleLocalJsonFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const json = JSON.parse(e.target.result);
-                    if (json && json.data && Array.isArray(json.data.options)) {
-                        const firstOcc = json.data.options.length > 0 ? parseOccSymbol(json.data.options[0].option) : null;
-                        if (firstOcc && json.data.options[0].option) {
-                            const rootMatch = json.data.options[0].option.trim().match(/^([A-Z0-9._]+?)\d{6}[CP]/);
-                            if (rootMatch && rootMatch[1]) {
-                                currentSymbol = rootMatch[1].replace(/^_/, '');
-                                document.getElementById('title-symbol').innerText = currentSymbol;
-                                document.getElementById('inp-custom-sym').value = currentSymbol;
-                                upsertWatchlistSymbol(currentSymbol, dividendYield);
-                            }
-                        }
-                        rawCboeChain = json;
-                        processFullChain(json);
-                        setFeedStatus('ok', '로컬 JSON');
-                        document.getElementById('val-update').innerText = new Date().toLocaleTimeString('ko-KR', { hour12: false });
-                    }
-                } catch (err) {
-                    alert("유효한 Cboe 옵션 JSON 파일이 아닙니다.");
-                }
-            };
-            reader.readAsText(file);
         }
 
         function resetPollCountdown() {
